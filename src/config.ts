@@ -1,4 +1,4 @@
-import { CellHook, PageHook } from './models'
+import { CellHook, CustomCellStyle, PageHook } from './models'
 
 export interface LineWidths {
   bottom: number
@@ -91,6 +91,20 @@ export interface UserOptions {
   willDrawPage?: PageHook
   /** Called after the plugin has finished drawing everything on a page. Can be used to add footers with page numbers or any other content that you want on each page there is an autotable. */
   didDrawPage?: PageHook
+}
+
+export type CellTextPartInput = string | CustomCellStyle
+export type CustomTableInputSyntax = (
+  | CellTextPartInput
+  | CellTextPartInput[]
+)[][]
+export type TextDecoratorUserOptions = Omit<
+  UserOptions,
+  'html' | 'head' | 'body' | 'foot'
+> & {
+  head?: RowInput[] | CustomTableInputSyntax
+  body?: RowInput[] | CustomTableInputSyntax
+  foot?: RowInput[] | CustomTableInputSyntax
 }
 
 export type ColumnInput =

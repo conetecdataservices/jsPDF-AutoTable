@@ -1,14 +1,15 @@
 'use strict'
 
 import _applyPlugin from './applyPlugin'
-import { UserOptions } from './config'
+import { TextDecoratorUserOptions, UserOptions } from './config'
 import { jsPDFConstructor, jsPDFDocument } from './documentHandler'
 import { parseInput } from './inputParser'
 import { drawTable as _drawTable } from './tableDrawer'
 import { createTable as _createTable } from './tableCalculator'
-import { Table } from './models'
+import { CellHook, Table } from './models'
 import { CellHookData } from './HookData'
 import { Cell, Column, Row } from './models'
+import { parseContentSection } from './textDecorators'
 
 export type autoTable = (options: UserOptions) => void
 
@@ -20,6 +21,45 @@ export function applyPlugin(jsPDF: jsPDFConstructor) {
 
 function autoTable(d: jsPDFDocument, options: UserOptions) {
   const input = parseInput(d, options)
+  const table = _createTable(d, input)
+  _drawTable(d, table)
+}
+
+function autoTableWithTextDecorators(
+  d: jsPDFDocument,
+  options: TextDecoratorUserOptions,
+) {
+  const headContent = parseContentSection(options.head)
+  const bodyContent = parseContentSection(options.body)
+  const footContent = parseContentSection(options.foot)
+
+  const contentConverterHook: CellHook = (data) => {
+    if (options.willDrawCell) options.willDrawCell(data)
+
+    if (data.section === 'head' && headContent?.customStyles) {
+      data.cell.text =
+        headContent?.customStyles[data.row.index][data.column.index]
+    } else if (data.section === 'body' && bodyContent?.customStyles) {
+      data.cell.text =
+        bodyContent?.customStyles[data.row.index][data.column.index]
+    } else if (data.section === 'foot' && footContent?.customStyles) {
+      data.cell.text =
+        footContent?.customStyles[data.row.index][data.column.index]
+    }
+  }
+
+  const submitOptions: UserOptions = {
+    ...(options as UserOptions),
+    head: headContent?.compat,
+    body: bodyContent?.compat,
+    foot: footContent?.compat,
+    willDrawCell:
+      headContent || bodyContent || footContent
+        ? contentConverterHook
+        : options.willDrawCell,
+  }
+
+  const input = parseInput(d, submitOptions)
   const table = _createTable(d, input)
   _drawTable(d, table)
 }
@@ -48,6 +88,7 @@ try {
 }
 
 export default autoTable
+export { autoTableWithTextDecorators }
 export { CellHookData }
 export { Table }
 export { Row }

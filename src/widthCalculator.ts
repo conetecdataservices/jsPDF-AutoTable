@@ -76,7 +76,8 @@ function calculate(doc: DocHandler, table: Table) {
       table.callCellHooks(doc, hooks, cell, row, column, null)
 
       const padding = cell.padding('horizontal')
-      cell.contentWidth = getStringWidth(cell.text, cell.styles, doc) + padding
+      cell.contentWidth =
+        getStringWidth(cell.text as string[], cell.styles, doc) + padding
 
       // Using [^\S\u00A0] instead of \s ensures that we split the text on all
       // whitespace except non-breaking spaces (\u00A0). We need to preserve
@@ -298,16 +299,28 @@ function fitContent(table: Table, doc: DocHandler) {
       if (cell.styles.overflow === 'linebreak') {
         // Add one pt to textSpace to fix rounding error
         cell.text = doc.splitTextToSize(
-          cell.text,
+          cell.text as string[],
           textSpace + 1 / doc.scaleFactor(),
           { fontSize: cell.styles.fontSize },
         )
       } else if (cell.styles.overflow === 'ellipsize') {
-        cell.text = ellipsize(cell.text, textSpace, cell.styles, doc, '...')
+        cell.text = ellipsize(
+          cell.text as string[],
+          textSpace,
+          cell.styles,
+          doc,
+          '...',
+        )
       } else if (cell.styles.overflow === 'hidden') {
-        cell.text = ellipsize(cell.text, textSpace, cell.styles, doc, '')
+        cell.text = ellipsize(
+          cell.text as string[],
+          textSpace,
+          cell.styles,
+          doc,
+          '',
+        )
       } else if (typeof cell.styles.overflow === 'function') {
-        const result = cell.styles.overflow(cell.text, textSpace)
+        const result = cell.styles.overflow(cell.text as string[], textSpace)
         if (typeof result === 'string') {
           cell.text = [result]
         } else {

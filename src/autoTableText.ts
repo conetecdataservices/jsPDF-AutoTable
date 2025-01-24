@@ -91,7 +91,7 @@ function iterateCellText(
         lineHeight: positioning.lineHeight,
       }
 
-      cb(part, newPosition)
+      cb(part as string | CustomCellStyle, newPosition)
     })
   } else {
     if (Array.isArray(cellText[0])) {
