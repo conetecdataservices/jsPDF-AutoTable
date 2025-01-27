@@ -292,9 +292,9 @@ export interface UserOptions {
 export type CellTextPartInput = string | CustomCellStyle;
 export type CustomTableInputSyntax = (CellTextPartInput | CellTextPartInput[])[][];
 export type TextDecoratorUserOptions = Omit<UserOptions, "html" | "head" | "body" | "foot"> & {
-	head?: RowInput[] | CustomTableInputSyntax;
-	body?: RowInput[] | CustomTableInputSyntax;
-	foot?: RowInput[] | CustomTableInputSyntax;
+	head?: CustomTableInputSyntax;
+	body?: CustomTableInputSyntax;
+	foot?: CustomTableInputSyntax;
 };
 export type ColumnInput = string | number | {
 	header?: CellInput;
@@ -335,7 +335,16 @@ export type RowInput = {
 export type autoTable = (options: UserOptions) => void;
 export declare function applyPlugin(jsPDF: jsPDFConstructor): void;
 declare function autoTable(d: jsPDFDocument, options: UserOptions): void;
-export declare function autoTableWithTextDecorators(d: jsPDFDocument, options: TextDecoratorUserOptions): void;
+/**
+ * run autoTable with a custom syntax that supports certain
+ * text decoration, such as: bold, italics, and super/subscripts
+ *
+ * Optionally supports drawing by page
+ */
+export declare function autoTableWithTextDecorators(d: jsPDFDocument, options: TextDecoratorUserOptions, drawByPage: true): {
+	drawNextPage: () => boolean;
+};
+export declare function autoTableWithTextDecorators(d: jsPDFDocument, options: TextDecoratorUserOptions, drawByPage?: false): void;
 declare function __createTable(d: jsPDFDocument, options: UserOptions): Table;
 declare function __drawTable(d: jsPDFDocument, table: Table): void;
 

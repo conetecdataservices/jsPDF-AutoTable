@@ -102,9 +102,9 @@ export type TextDecoratorUserOptions = Omit<
   UserOptions,
   'html' | 'head' | 'body' | 'foot'
 > & {
-  head?: RowInput[] | CustomTableInputSyntax
-  body?: RowInput[] | CustomTableInputSyntax
-  foot?: RowInput[] | CustomTableInputSyntax
+  head?: CustomTableInputSyntax
+  body?: CustomTableInputSyntax
+  foot?: CustomTableInputSyntax
 }
 
 export type ColumnInput =

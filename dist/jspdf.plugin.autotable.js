@@ -9,11 +9,11 @@
  */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
-		module.exports = factory((function webpackLoadOptionalExternalModule() { try { return require("jspdf"); } catch(e) {} }()));
+		module.exports = factory(require("jspdf"));
 	else if(typeof define === 'function' && define.amd)
 		define(["jspdf"], factory);
 	else {
-		var a = typeof exports === 'object' ? factory((function webpackLoadOptionalExternalModule() { try { return require("jspdf"); } catch(e) {} }())) : factory(root["jspdf"]);
+		var a = typeof exports === 'object' ? factory(require("jspdf")) : factory(root["jspdf"]);
 		for(var i in a) (typeof exports === 'object' ? exports : root)[i] = a[i];
 	}
 })(typeof globalThis !== 'undefined' ? globalThis : typeof this !== 'undefined' ? this : typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : global , function(__WEBPACK_EXTERNAL_MODULE__964__) {
@@ -1335,7 +1335,49 @@ function autoTable(d, options) {
     var table = (0, tableCalculator_1.createTable)(d, input);
     (0, tableDrawer_1.drawTable)(d, table);
 }
-function autoTableWithTextDecorators(d, options) {
+function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
+    // Get page position
+    var pagePosition;
+    if (pageNumber === 0) {
+        pagePosition = 'start';
+    }
+    else if (pageNumber === totalPages - 1) {
+        pagePosition = 'end';
+    }
+    else {
+        pagePosition = 'middle';
+    }
+    var bodyContent = options.body;
+    var dataToDraw = bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.slice(bounds.min, bounds.max + 1);
+    var showHead = false;
+    var showFoot = false;
+    switch (pagePosition) {
+        case 'start':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showHead === 'firstPage')
+                showHead = true;
+            break;
+        case 'middle':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            break;
+        case 'end':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showFoot === 'lastPage')
+                showFoot = true;
+            break;
+    }
+    autoTable(d, __assign(__assign({}, options), { body: dataToDraw, showHead: showHead, showFoot: showFoot }));
+}
+function autoTableWithTextDecorators(d, options, drawByPage) {
     var headContent = (0, textDecorators_1.parseContentSection)(options.head);
     var bodyContent = (0, textDecorators_1.parseContentSection)(options.body);
     var footContent = (0, textDecorators_1.parseContentSection)(options.foot);
@@ -1358,9 +1400,21 @@ function autoTableWithTextDecorators(d, options) {
     var submitOptions = __assign(__assign({}, options), { head: headContent === null || headContent === void 0 ? void 0 : headContent.compat, body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.compat, foot: footContent === null || footContent === void 0 ? void 0 : footContent.compat, willDrawCell: headContent || bodyContent || footContent
             ? contentConverterHook
             : options.willDrawCell });
-    var input = (0, inputParser_1.parseInput)(d, submitOptions);
-    var table = (0, tableCalculator_1.createTable)(d, input);
-    (0, tableDrawer_1.drawTable)(d, table);
+    if (drawByPage !== true) {
+        return autoTable(d, submitOptions);
+    }
+    // Draw by page
+    var pageDelimits = (0, textDecorators_1.delimitDataByPage)(submitOptions, autoTable);
+    var iterator = pageDelimits.entries();
+    return {
+        drawNextPage: function () {
+            var pageBounds = iterator.next();
+            if (pageBounds.done)
+                return false;
+            drawSinglePageContent(d, submitOptions, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
+            return true;
+        },
+    };
 }
 exports.autoTableWithTextDecorators = autoTableWithTextDecorators;
 // Experimental export
@@ -2339,31 +2393,27 @@ exports.calculateAllColumnsCanFitInPage = calculateAllColumnsCanFitInPage;
 /***/ }),
 
 /***/ 788:
-/***/ (function(__unused_webpack_module, exports) {
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.parseContentSection = void 0;
-function classifyInput(data) {
-    if (data.every(function (row) {
-        if (Array.isArray(row)) {
-            row.every(function (cell) {
-                return typeof cell === 'string' || typeof cell === 'object';
-            });
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
         }
-        return false;
-    })) {
-        return 'custom';
-    }
-    return 'normal';
-}
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.delimitDataByPage = exports.parseContentSection = void 0;
+var jspdf_1 = __webpack_require__(964);
 /**
  * Converts decorator syntax into the syntax used by the drawTable function
  */
-function parseBodyToCompat(format, data) {
-    if (format === 'normal') {
-        return data;
-    }
+function parseBodyToCompat(data) {
     return data.map(function (row) {
         return row.map(function (cell) {
             if (Array.isArray(cell)) {
@@ -2428,21 +2478,42 @@ function normalizeCustomCellStyles(styledData) {
 function parseContentSection(section) {
     if (!section)
         return undefined;
-    var format = classifyInput(section);
-    var rowInput = parseBodyToCompat(format, section);
-    if (format === 'custom') {
-        return {
-            compat: rowInput,
-            customStyles: normalizeCustomCellStyles(section),
-        };
-    }
-    else {
-        return {
-            compat: rowInput,
-        };
-    }
+    var rowInput = parseBodyToCompat(section);
+    return {
+        compat: rowInput,
+        customStyles: normalizeCustomCellStyles(section),
+    };
 }
 exports.parseContentSection = parseContentSection;
+function delimitDataByPage(submitOptions, autoTableCb) {
+    var tmpDoc = new jspdf_1.default();
+    var firstLastElPerPage = [];
+    var currentBounds = { page: 0, min: 0, max: Infinity };
+    autoTableCb(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
+            if (submitOptions.didDrawCell)
+                submitOptions.didDrawCell(data);
+            if (currentBounds.page !== data.pageNumber) {
+                if (currentBounds.page !== 0) {
+                    firstLastElPerPage.push({
+                        min: currentBounds.min,
+                        max: currentBounds.max,
+                    });
+                }
+                currentBounds = {
+                    page: data.pageNumber,
+                    min: data.row.index,
+                    max: data.row.index,
+                };
+            }
+            else {
+                if (data.row.index > currentBounds.max)
+                    currentBounds.max = data.row.index;
+            }
+        } }));
+    firstLastElPerPage.push({ min: currentBounds.min, max: currentBounds.max });
+    return firstLastElPerPage;
+}
+exports.delimitDataByPage = delimitDataByPage;
 
 
 /***/ }),
@@ -2767,8 +2838,6 @@ function ellipsizeStr(text, width, styles, doc, overflow) {
 
 /***/ 964:
 /***/ (function(module) {
-
-if(typeof __WEBPACK_EXTERNAL_MODULE__964__ === 'undefined') { var e = new Error("Cannot find module 'undefined'"); e.code = 'MODULE_NOT_FOUND'; throw e; }
 
 module.exports = __WEBPACK_EXTERNAL_MODULE__964__;
 

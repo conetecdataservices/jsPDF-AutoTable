@@ -1,36 +1,19 @@
-import { CellTextPartInput, CustomTableInputSyntax, RowInput } from './config'
+import jsPDF from 'jspdf'
+import {
+  CellTextPartInput,
+  CustomTableInputSyntax,
+  RowInput,
+  UserOptions,
+} from './config'
 import { CustomCellText, CustomCellTextLine } from './models'
+import type autoTable from './main'
 
-type InputFormat = 'normal' | 'custom'
-function classifyInput(data: CustomTableInputSyntax | RowInput[]): InputFormat {
-  if (
-    data.every((row) => {
-      if (Array.isArray(row)) {
-        row.every((cell) => {
-          return typeof cell === 'string' || typeof cell === 'object'
-        })
-      }
-
-      return false
-    })
-  ) {
-    return 'custom'
-  }
-
-  return 'normal'
-}
+type CustomCellTextGrid = CustomCellText[][] // Multi-row, multi-column
 
 /**
  * Converts decorator syntax into the syntax used by the drawTable function
  */
-function parseBodyToCompat<Format extends InputFormat>(
-  format: Format,
-  data: Format extends 'normal' ? RowInput[] : CustomTableInputSyntax,
-): RowInput[] {
-  if (format === 'normal') {
-    return data as RowInput[]
-  }
-
+function parseBodyToCompat(data: CustomTableInputSyntax): RowInput[] {
   return (data as CustomTableInputSyntax).map((row) => {
     return row.map((cell) => {
       if (Array.isArray(cell)) {
@@ -71,7 +54,7 @@ function parsePart(part: CellTextPartInput): CustomCellTextLine {
  */
 function normalizeCustomCellStyles(
   styledData: CustomTableInputSyntax,
-): CustomCellText[][] {
+): CustomCellTextGrid {
   // Multi-row, multi-column
   return styledData.map((row) => {
     return row.map((cell) => {
@@ -100,30 +83,55 @@ function normalizeCustomCellStyles(
   })
 }
 
-export function parseContentSection(
-  section?: RowInput[] | CustomTableInputSyntax,
-):
+export function parseContentSection(section?: CustomTableInputSyntax):
   | {
       compat: RowInput[]
-      customStyles?: CustomCellText[][]
+      customStyles?: CustomCellTextGrid
     }
   | undefined {
   if (!section) return undefined
 
-  const format = classifyInput(section)
+  const rowInput = parseBodyToCompat(section)
 
-  const rowInput = parseBodyToCompat(format, section)
-
-  if (format === 'custom') {
-    return {
-      compat: rowInput,
-      customStyles: normalizeCustomCellStyles(
-        section as CustomTableInputSyntax,
-      ),
-    }
-  } else {
-    return {
-      compat: rowInput,
-    }
+  return {
+    compat: rowInput,
+    customStyles: normalizeCustomCellStyles(section as CustomTableInputSyntax),
   }
+}
+
+export function delimitDataByPage(
+  submitOptions: UserOptions,
+  autoTableCb: typeof autoTable,
+) {
+  const tmpDoc = new jsPDF()
+
+  const firstLastElPerPage: { min: number; max: number }[] = []
+  let currentBounds = { page: 0, min: 0, max: Infinity }
+
+  autoTableCb(tmpDoc, {
+    ...submitOptions,
+    didDrawCell: (data) => {
+      if (submitOptions.didDrawCell) submitOptions.didDrawCell(data)
+
+      if (currentBounds.page !== data.pageNumber) {
+        if (currentBounds.page !== 0) {
+          firstLastElPerPage.push({
+            min: currentBounds.min,
+            max: currentBounds.max,
+          })
+        }
+        currentBounds = {
+          page: data.pageNumber,
+          min: data.row.index,
+          max: data.row.index,
+        }
+      } else {
+        if (data.row.index > currentBounds.max)
+          currentBounds.max = data.row.index
+      }
+    },
+  })
+
+  firstLastElPerPage.push({ min: currentBounds.min, max: currentBounds.max })
+  return firstLastElPerPage
 }

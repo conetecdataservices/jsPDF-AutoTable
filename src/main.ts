@@ -9,7 +9,7 @@ import { createTable as _createTable } from './tableCalculator'
 import { CellHook, Table } from './models'
 import { CellHookData } from './HookData'
 import { Cell, Column, Row } from './models'
-import { parseContentSection } from './textDecorators'
+import { delimitDataByPage, parseContentSection } from './textDecorators'
 
 export type autoTable = (options: UserOptions) => void
 
@@ -25,10 +25,76 @@ function autoTable(d: jsPDFDocument, options: UserOptions) {
   _drawTable(d, table)
 }
 
+function drawSinglePageContent(
+  d: jsPDFDocument,
+  options: UserOptions,
+  bounds: { min: number; max: number },
+  pageNumber: number,
+  totalPages: number,
+) {
+  // Get page position
+  let pagePosition: 'start' | 'middle' | 'end'
+  if (pageNumber === 0) {
+    pagePosition = 'start'
+  } else if (pageNumber === totalPages - 1) {
+    pagePosition = 'end'
+  } else {
+    pagePosition = 'middle'
+  }
+
+  const bodyContent = options.body
+  const dataToDraw = bodyContent?.slice(bounds.min, bounds.max + 1)
+
+  let showHead = false
+  let showFoot = false
+  switch (pagePosition) {
+    case 'start':
+      if (options.showHead === 'everyPage') showHead = true
+      if (options.showFoot === 'everyPage') showFoot = true
+
+      if (options.showHead === 'firstPage') showHead = true
+      break
+    case 'middle':
+      if (options.showHead === 'everyPage') showHead = true
+      if (options.showFoot === 'everyPage') showFoot = true
+      break
+    case 'end':
+      if (options.showHead === 'everyPage') showHead = true
+      if (options.showFoot === 'everyPage') showFoot = true
+
+      if (options.showFoot === 'lastPage') showFoot = true
+      break
+  }
+
+  autoTable(d, {
+    ...options,
+    body: dataToDraw,
+    showHead,
+    showFoot,
+  })
+}
+
+/**
+ * run autoTable with a custom syntax that supports certain
+ * text decoration, such as: bold, italics, and super/subscripts
+ *
+ * Optionally supports drawing by page
+ */
 function autoTableWithTextDecorators(
   d: jsPDFDocument,
   options: TextDecoratorUserOptions,
-) {
+  drawByPage: true,
+): { drawNextPage: () => boolean }
+function autoTableWithTextDecorators(
+  d: jsPDFDocument,
+  options: TextDecoratorUserOptions,
+  drawByPage?: false,
+): void
+function autoTableWithTextDecorators(
+  d: jsPDFDocument,
+  options: TextDecoratorUserOptions,
+  drawByPage?: boolean,
+): void | { drawNextPage: () => boolean } {
   const headContent = parseContentSection(options.head)
   const bodyContent = parseContentSection(options.body)
   const footContent = parseContentSection(options.foot)
@@ -59,9 +125,31 @@ function autoTableWithTextDecorators(
         : options.willDrawCell,
   }
 
-  const input = parseInput(d, submitOptions)
-  const table = _createTable(d, input)
-  _drawTable(d, table)
+  if (drawByPage !== true) {
+    return autoTable(d, submitOptions)
+  }
+
+  // Draw by page
+  const pageDelimits = delimitDataByPage(submitOptions, autoTable)
+  const iterator = pageDelimits.entries()
+
+  return {
+    drawNextPage: () => {
+      const pageBounds = iterator.next()
+
+      if (pageBounds.done) return false
+
+      drawSinglePageContent(
+        d,
+        submitOptions,
+        pageBounds.value[1],
+        pageBounds.value[0],
+        pageDelimits.length,
+      )
+
+      return true
+    },
+  }
 }
 
 // Experimental export

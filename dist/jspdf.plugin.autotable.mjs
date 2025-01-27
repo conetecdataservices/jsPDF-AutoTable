@@ -1,3 +1,5 @@
+import jsPDF$1 from 'jspdf';
+
 /******************************************************************************
 Copyright (c) Microsoft Corporation.
 
@@ -2348,26 +2350,10 @@ function _applyPlugin (jsPDF) {
     };
 }
 
-function classifyInput(data) {
-    if (data.every(function (row) {
-        if (Array.isArray(row)) {
-            row.every(function (cell) {
-                return typeof cell === 'string' || typeof cell === 'object';
-            });
-        }
-        return false;
-    })) {
-        return 'custom';
-    }
-    return 'normal';
-}
 /**
  * Converts decorator syntax into the syntax used by the drawTable function
  */
-function parseBodyToCompat(format, data) {
-    if (format === 'normal') {
-        return data;
-    }
+function parseBodyToCompat(data) {
     return data.map(function (row) {
         return row.map(function (cell) {
             if (Array.isArray(cell)) {
@@ -2432,19 +2418,39 @@ function normalizeCustomCellStyles(styledData) {
 function parseContentSection(section) {
     if (!section)
         return undefined;
-    var format = classifyInput(section);
-    var rowInput = parseBodyToCompat(format, section);
-    if (format === 'custom') {
-        return {
-            compat: rowInput,
-            customStyles: normalizeCustomCellStyles(section),
-        };
-    }
-    else {
-        return {
-            compat: rowInput,
-        };
-    }
+    var rowInput = parseBodyToCompat(section);
+    return {
+        compat: rowInput,
+        customStyles: normalizeCustomCellStyles(section),
+    };
+}
+function delimitDataByPage(submitOptions, autoTableCb) {
+    var tmpDoc = new jsPDF$1();
+    var firstLastElPerPage = [];
+    var currentBounds = { page: 0, min: 0, max: Infinity };
+    autoTableCb(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
+            if (submitOptions.didDrawCell)
+                submitOptions.didDrawCell(data);
+            if (currentBounds.page !== data.pageNumber) {
+                if (currentBounds.page !== 0) {
+                    firstLastElPerPage.push({
+                        min: currentBounds.min,
+                        max: currentBounds.max,
+                    });
+                }
+                currentBounds = {
+                    page: data.pageNumber,
+                    min: data.row.index,
+                    max: data.row.index,
+                };
+            }
+            else {
+                if (data.row.index > currentBounds.max)
+                    currentBounds.max = data.row.index;
+            }
+        } }));
+    firstLastElPerPage.push({ min: currentBounds.min, max: currentBounds.max });
+    return firstLastElPerPage;
 }
 
 // export { applyPlugin } didn't export applyPlugin
@@ -2457,7 +2463,49 @@ function autoTable(d, options) {
     var table = createTable(d, input);
     drawTable(d, table);
 }
-function autoTableWithTextDecorators(d, options) {
+function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
+    // Get page position
+    var pagePosition;
+    if (pageNumber === 0) {
+        pagePosition = 'start';
+    }
+    else if (pageNumber === totalPages - 1) {
+        pagePosition = 'end';
+    }
+    else {
+        pagePosition = 'middle';
+    }
+    var bodyContent = options.body;
+    var dataToDraw = bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.slice(bounds.min, bounds.max + 1);
+    var showHead = false;
+    var showFoot = false;
+    switch (pagePosition) {
+        case 'start':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showHead === 'firstPage')
+                showHead = true;
+            break;
+        case 'middle':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            break;
+        case 'end':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showFoot === 'lastPage')
+                showFoot = true;
+            break;
+    }
+    autoTable(d, __assign(__assign({}, options), { body: dataToDraw, showHead: showHead, showFoot: showFoot }));
+}
+function autoTableWithTextDecorators(d, options, drawByPage) {
     var headContent = parseContentSection(options.head);
     var bodyContent = parseContentSection(options.body);
     var footContent = parseContentSection(options.foot);
@@ -2480,9 +2528,21 @@ function autoTableWithTextDecorators(d, options) {
     var submitOptions = __assign(__assign({}, options), { head: headContent === null || headContent === void 0 ? void 0 : headContent.compat, body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.compat, foot: footContent === null || footContent === void 0 ? void 0 : footContent.compat, willDrawCell: headContent || bodyContent || footContent
             ? contentConverterHook
             : options.willDrawCell });
-    var input = parseInput(d, submitOptions);
-    var table = createTable(d, input);
-    drawTable(d, table);
+    if (drawByPage !== true) {
+        return autoTable(d, submitOptions);
+    }
+    // Draw by page
+    var pageDelimits = delimitDataByPage(submitOptions, autoTable);
+    var iterator = pageDelimits.entries();
+    return {
+        drawNextPage: function () {
+            var pageBounds = iterator.next();
+            if (pageBounds.done)
+                return false;
+            drawSinglePageContent(d, submitOptions, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
+            return true;
+        },
+    };
 }
 // Experimental export
 function __createTable(d, options) {
