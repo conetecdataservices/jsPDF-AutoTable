@@ -6,13 +6,14 @@ import { jsPDFConstructor, jsPDFDocument } from './documentHandler'
 import { parseInput } from './inputParser'
 import { drawTable as _drawTable } from './tableDrawer'
 import { createTable as _createTable } from './tableCalculator'
-import { CellHook, Table } from './models'
+import { Table } from './models'
 import { CellHookData } from './HookData'
 import { Cell, Column, Row } from './models'
 import {
   delimitDataByPage,
   doAutoTable,
   drawSinglePageContent,
+  makeContentConverterHook,
   parseContentSection,
 } from './tableExtensions'
 
@@ -65,30 +66,20 @@ function autoTableWithTextDecorators(
   const bodyContent = parseContentSection(options.body)
   const footContent = parseContentSection(options.foot)
 
-  const contentConverterHook: CellHook = (data) => {
-    if (options.willDrawCell) options.willDrawCell(data)
-
-    if (data.section === 'head' && headContent?.customStyles) {
-      data.cell.text =
-        headContent?.customStyles[data.row.index][data.column.index]
-    } else if (data.section === 'body' && bodyContent?.customStyles) {
-      data.cell.text =
-        bodyContent?.customStyles[data.row.index][data.column.index]
-    } else if (data.section === 'foot' && footContent?.customStyles) {
-      data.cell.text =
-        footContent?.customStyles[data.row.index][data.column.index]
-    }
-  }
-
   const submitOptions: UserOptions = {
     ...(options as UserOptions),
     head: headContent?.compat,
     body: bodyContent?.compat,
     foot: footContent?.compat,
-    willDrawCell:
-      headContent || bodyContent || footContent
-        ? contentConverterHook
-        : options.willDrawCell,
+    willDrawCell: (data) => {
+      if (options.willDrawCell) options.willDrawCell(data)
+
+      makeContentConverterHook({
+        head: headContent?.customStyles,
+        body: bodyContent?.customStyles,
+        foot: footContent?.customStyles,
+      })(data)
+    },
   }
 
   if (documentOrDrawByPage !== true) {
@@ -108,6 +99,11 @@ function autoTableWithTextDecorators(
         drawSinglePageContent(
           document,
           submitOptions,
+          {
+            body: bodyContent?.customStyles,
+            head: headContent?.customStyles,
+            foot: footContent?.customStyles,
+          },
           pageBounds.value[1],
           pageBounds.value[0],
           pageDelimits.length,

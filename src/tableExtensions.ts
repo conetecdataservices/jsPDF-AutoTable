@@ -8,7 +8,7 @@ import {
   RowInput,
   UserOptions,
 } from './config'
-import { CustomCellText, CustomCellTextLine } from './models'
+import { CellHook, CustomCellText, CustomCellTextLine } from './models'
 import { jsPDFDocument } from './documentHandler'
 import { drawTable as _drawTable } from './tableDrawer'
 import { createTable as _createTable } from './tableCalculator'
@@ -132,14 +132,13 @@ function normalizeCustomCellStyles(
   })
 }
 
+type ParsedContentSection = {
+  compat: RowInput[]
+  customStyles?: CustomCellTextGrid
+}
 export function parseContentSection(
   section?: RowInput[] | CustomTableInputSyntax,
-):
-  | {
-      compat: RowInput[]
-      customStyles?: CustomCellTextGrid
-    }
-  | undefined {
+): ParsedContentSection | undefined {
   if (!section) return undefined
 
   const format = classifyInput(section)
@@ -160,6 +159,25 @@ export function parseContentSection(
   }
 }
 
+type CustomStyleContentSections = {
+  head?: CustomCellTextGrid
+  body?: CustomCellTextGrid
+  foot?: CustomCellTextGrid
+}
+export function makeContentConverterHook(
+  contentSections?: CustomStyleContentSections,
+): CellHook {
+  return (data) => {
+    if (data.section === 'head' && contentSections?.head) {
+      data.cell.text = contentSections.head[data.row.index][data.column.index]
+    } else if (data.section === 'body' && contentSections?.body) {
+      data.cell.text = contentSections.body[data.row.index][data.column.index]
+    } else if (data.section === 'foot' && contentSections?.foot) {
+      data.cell.text = contentSections.foot[data.row.index][data.column.index]
+    }
+  }
+}
+
 export function delimitDataByPage(submitOptions: UserOptions) {
   const tmpDoc = new jsPDF()
 
@@ -170,6 +188,8 @@ export function delimitDataByPage(submitOptions: UserOptions) {
     ...submitOptions,
     didDrawCell: (data) => {
       if (submitOptions.didDrawCell) submitOptions.didDrawCell(data)
+
+      if (data.row.section !== 'body') return
 
       if (currentBounds.page !== data.pageNumber) {
         if (currentBounds.page !== 0) {
@@ -197,6 +217,7 @@ export function delimitDataByPage(submitOptions: UserOptions) {
 export function drawSinglePageContent(
   d: jsPDFDocument,
   options: UserOptions,
+  contentSections: CustomStyleContentSections,
   bounds: { min: number; max: number },
   pageNumber: number,
   totalPages: number,
@@ -211,8 +232,20 @@ export function drawSinglePageContent(
     pagePosition = 'middle'
   }
 
-  const bodyContent = options.body
-  const dataToDraw = bodyContent?.slice(bounds.min, bounds.max + 1)
+  const bodyContentToDraw = options.body?.slice(bounds.min, bounds.max + 1)
+
+  const bodyReplacementContent = contentSections.body?.slice(
+    bounds.min,
+    bounds.max + 1,
+  )
+  const headReplacementContent = contentSections.head?.slice(
+    bounds.min,
+    bounds.max + 1,
+  )
+  const footReplacementContent = contentSections.foot?.slice(
+    bounds.min,
+    bounds.max + 1,
+  )
 
   let showHead = false
   let showFoot = false
@@ -237,8 +270,18 @@ export function drawSinglePageContent(
 
   doAutoTable(d, {
     ...options,
-    body: dataToDraw,
+    body: bodyContentToDraw,
     showHead,
     showFoot,
+
+    willDrawCell: (data) => {
+      if (options.willDrawCell) options.willDrawCell(data)
+
+      makeContentConverterHook({
+        head: headReplacementContent,
+        body: bodyReplacementContent,
+        foot: footReplacementContent,
+      })(data)
+    },
   })
 }
