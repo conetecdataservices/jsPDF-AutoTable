@@ -2350,10 +2350,26 @@ function _applyPlugin (jsPDF) {
     };
 }
 
+function classifyInput(data) {
+    if (data.every(function (row) {
+        if (Array.isArray(row)) {
+            row.every(function (cell) {
+                return typeof cell === 'string' || typeof cell === 'object';
+            });
+        }
+        return false;
+    })) {
+        return 'custom';
+    }
+    return 'normal';
+}
 /**
  * Converts decorator syntax into the syntax used by the drawTable function
  */
-function parseBodyToCompat(data) {
+function parseBodyToCompat(format, data) {
+    if (format === 'normal') {
+        return data;
+    }
     return data.map(function (row) {
         return row.map(function (cell) {
             if (Array.isArray(cell)) {
@@ -2418,11 +2434,19 @@ function normalizeCustomCellStyles(styledData) {
 function parseContentSection(section) {
     if (!section)
         return undefined;
-    var rowInput = parseBodyToCompat(section);
-    return {
-        compat: rowInput,
-        customStyles: normalizeCustomCellStyles(section),
-    };
+    var format = classifyInput(section);
+    var rowInput = parseBodyToCompat(format, section);
+    if (format === 'custom') {
+        return {
+            compat: rowInput,
+            customStyles: normalizeCustomCellStyles(section),
+        };
+    }
+    else {
+        return {
+            compat: rowInput,
+        };
+    }
 }
 function delimitDataByPage(submitOptions, autoTableCb) {
     var tmpDoc = new jsPDF$1();

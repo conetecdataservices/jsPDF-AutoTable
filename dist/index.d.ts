@@ -292,9 +292,9 @@ export interface UserOptions {
 export type CellTextPartInput = string | CustomCellStyle;
 export type CustomTableInputSyntax = (CellTextPartInput | CellTextPartInput[])[][];
 export type TextDecoratorUserOptions = Omit<UserOptions, "html" | "head" | "body" | "foot"> & {
-	head?: CustomTableInputSyntax;
-	body?: CustomTableInputSyntax;
-	foot?: CustomTableInputSyntax;
+	head?: RowInput[] | CustomTableInputSyntax;
+	body?: RowInput[] | CustomTableInputSyntax;
+	foot?: RowInput[] | CustomTableInputSyntax;
 };
 export type ColumnInput = string | number | {
 	header?: CellInput;
