@@ -2350,6 +2350,13 @@ function _applyPlugin (jsPDF) {
     };
 }
 
+// Custom table extensions for jsPDF-AutoTable, including support for text decorators and drawing by page
+// Also includes a new custom data format to make text decorators easier to use
+function doAutoTable(d, options) {
+    var input = parseInput(d, options);
+    var table = createTable(d, input);
+    drawTable(d, table);
+}
 function classifyInput(data) {
     if (data.every(function (row) {
         if (Array.isArray(row)) {
@@ -2448,11 +2455,11 @@ function parseContentSection(section) {
         };
     }
 }
-function delimitDataByPage(submitOptions, autoTableCb) {
+function delimitDataByPage(submitOptions) {
     var tmpDoc = new jsPDF$1();
     var firstLastElPerPage = [];
     var currentBounds = { page: 0, min: 0, max: Infinity };
-    autoTableCb(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
+    doAutoTable(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
             if (submitOptions.didDrawCell)
                 submitOptions.didDrawCell(data);
             if (currentBounds.page !== data.pageNumber) {
@@ -2475,17 +2482,6 @@ function delimitDataByPage(submitOptions, autoTableCb) {
         } }));
     firstLastElPerPage.push({ min: currentBounds.min, max: currentBounds.max });
     return firstLastElPerPage;
-}
-
-// export { applyPlugin } didn't export applyPlugin
-// to index.d.ts for some reason
-function applyPlugin(jsPDF) {
-    _applyPlugin(jsPDF);
-}
-function autoTable(d, options) {
-    var input = parseInput(d, options);
-    var table = createTable(d, input);
-    drawTable(d, table);
 }
 function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
     // Get page position
@@ -2527,9 +2523,18 @@ function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
                 showFoot = true;
             break;
     }
-    autoTable(d, __assign(__assign({}, options), { body: dataToDraw, showHead: showHead, showFoot: showFoot }));
+    doAutoTable(d, __assign(__assign({}, options), { body: dataToDraw, showHead: showHead, showFoot: showFoot }));
 }
-function autoTableWithTextDecorators(d, options, drawByPage) {
+
+// export { applyPlugin } didn't export applyPlugin
+// to index.d.ts for some reason
+function applyPlugin(jsPDF) {
+    _applyPlugin(jsPDF);
+}
+function autoTable(d, options) {
+    doAutoTable(d, options);
+}
+function autoTableWithTextDecorators(documentOrDrawByPage, options) {
     var headContent = parseContentSection(options.head);
     var bodyContent = parseContentSection(options.body);
     var footContent = parseContentSection(options.foot);
@@ -2552,19 +2557,20 @@ function autoTableWithTextDecorators(d, options, drawByPage) {
     var submitOptions = __assign(__assign({}, options), { head: headContent === null || headContent === void 0 ? void 0 : headContent.compat, body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.compat, foot: footContent === null || footContent === void 0 ? void 0 : footContent.compat, willDrawCell: headContent || bodyContent || footContent
             ? contentConverterHook
             : options.willDrawCell });
-    if (drawByPage !== true) {
-        return autoTable(d, submitOptions);
+    if (documentOrDrawByPage !== true) {
+        return autoTable(documentOrDrawByPage, submitOptions);
     }
     // Draw by page
-    var pageDelimits = delimitDataByPage(submitOptions, autoTable);
+    var pageDelimits = delimitDataByPage(submitOptions);
     var iterator = pageDelimits.entries();
     return {
-        drawNextPage: function () {
+        numPages: pageDelimits.length,
+        drawNextPage: function (document) {
             var pageBounds = iterator.next();
-            if (pageBounds.done)
-                return false;
-            drawSinglePageContent(d, submitOptions, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
-            return true;
+            if (!pageBounds.done) {
+                drawSinglePageContent(document, submitOptions, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
+            }
+            return !pageBounds.done;
         },
     };
 }

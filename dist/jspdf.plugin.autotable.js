@@ -1323,7 +1323,7 @@ var models_2 = __webpack_require__(260);
 Object.defineProperty(exports, "Cell", ({ enumerable: true, get: function () { return models_2.Cell; } }));
 Object.defineProperty(exports, "Column", ({ enumerable: true, get: function () { return models_2.Column; } }));
 Object.defineProperty(exports, "Row", ({ enumerable: true, get: function () { return models_2.Row; } }));
-var textDecorators_1 = __webpack_require__(788);
+var tableExtensions_1 = __webpack_require__(708);
 // export { applyPlugin } didn't export applyPlugin
 // to index.d.ts for some reason
 function applyPlugin(jsPDF) {
@@ -1331,56 +1331,12 @@ function applyPlugin(jsPDF) {
 }
 exports.applyPlugin = applyPlugin;
 function autoTable(d, options) {
-    var input = (0, inputParser_1.parseInput)(d, options);
-    var table = (0, tableCalculator_1.createTable)(d, input);
-    (0, tableDrawer_1.drawTable)(d, table);
+    (0, tableExtensions_1.doAutoTable)(d, options);
 }
-function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
-    // Get page position
-    var pagePosition;
-    if (pageNumber === 0) {
-        pagePosition = 'start';
-    }
-    else if (pageNumber === totalPages - 1) {
-        pagePosition = 'end';
-    }
-    else {
-        pagePosition = 'middle';
-    }
-    var bodyContent = options.body;
-    var dataToDraw = bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.slice(bounds.min, bounds.max + 1);
-    var showHead = false;
-    var showFoot = false;
-    switch (pagePosition) {
-        case 'start':
-            if (options.showHead === 'everyPage')
-                showHead = true;
-            if (options.showFoot === 'everyPage')
-                showFoot = true;
-            if (options.showHead === 'firstPage')
-                showHead = true;
-            break;
-        case 'middle':
-            if (options.showHead === 'everyPage')
-                showHead = true;
-            if (options.showFoot === 'everyPage')
-                showFoot = true;
-            break;
-        case 'end':
-            if (options.showHead === 'everyPage')
-                showHead = true;
-            if (options.showFoot === 'everyPage')
-                showFoot = true;
-            if (options.showFoot === 'lastPage')
-                showFoot = true;
-            break;
-    }
-    autoTable(d, __assign(__assign({}, options), { body: dataToDraw, showHead: showHead, showFoot: showFoot }));
-}
-function autoTableWithTextDecorators(d, options, drawByPage) {
-    var headContent = (0, textDecorators_1.parseContentSection)(options.head);
-    var bodyContent = (0, textDecorators_1.parseContentSection)(options.body);
-    var footContent = (0, textDecorators_1.parseContentSection)(options.foot);
+function autoTableWithTextDecorators(documentOrDrawByPage, options) {
+    var headContent = (0, tableExtensions_1.parseContentSection)(options.head);
+    var bodyContent = (0, tableExtensions_1.parseContentSection)(options.body);
+    var footContent = (0, tableExtensions_1.parseContentSection)(options.foot);
     var contentConverterHook = function (data) {
         if (options.willDrawCell)
             options.willDrawCell(data);
@@ -1400,19 +1356,20 @@ function autoTableWithTextDecorators(d, options, drawByPage) {
     var submitOptions = __assign(__assign({}, options), { head: headContent === null || headContent === void 0 ? void 0 : headContent.compat, body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.compat, foot: footContent === null || footContent === void 0 ? void 0 : footContent.compat, willDrawCell: headContent || bodyContent || footContent
             ? contentConverterHook
             : options.willDrawCell });
-    if (drawByPage !== true) {
-        return autoTable(d, submitOptions);
+    if (documentOrDrawByPage !== true) {
+        return autoTable(documentOrDrawByPage, submitOptions);
     }
     // Draw by page
-    var pageDelimits = (0, textDecorators_1.delimitDataByPage)(submitOptions, autoTable);
+    var pageDelimits = (0, tableExtensions_1.delimitDataByPage)(submitOptions);
     var iterator = pageDelimits.entries();
     return {
-        drawNextPage: function () {
+        numPages: pageDelimits.length,
+        drawNextPage: function (document) {
             var pageBounds = iterator.next();
-            if (pageBounds.done)
-                return false;
-            drawSinglePageContent(d, submitOptions, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
-            return true;
+            if (!pageBounds.done) {
+                (0, tableExtensions_1.drawSinglePageContent)(document, submitOptions, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
+            }
+            return !pageBounds.done;
         },
     };
 }
@@ -2316,86 +2273,12 @@ function nextPage(doc) {
 
 /***/ }),
 
-/***/ 224:
+/***/ 708:
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.calculateAllColumnsCanFitInPage = void 0;
-var common_1 = __webpack_require__(420);
-// get columns can be fit into page
-function getColumnsCanFitInPage(doc, table, config) {
-    var _a;
-    if (config === void 0) { config = {}; }
-    // Get page width
-    var remainingWidth = (0, common_1.getPageAvailableWidth)(doc, table);
-    // Get column data key to repeat
-    var repeatColumnsMap = new Map();
-    var colIndexes = [];
-    var columns = [];
-    var horizontalPageBreakRepeat = [];
-    table.settings.horizontalPageBreakRepeat;
-    if (Array.isArray(table.settings.horizontalPageBreakRepeat)) {
-        horizontalPageBreakRepeat = table.settings.horizontalPageBreakRepeat;
-        // It can be a single value of type string or number (even number: 0)
-    }
-    else if (typeof table.settings.horizontalPageBreakRepeat === 'string' ||
-        typeof table.settings.horizontalPageBreakRepeat === 'number') {
-        horizontalPageBreakRepeat = [table.settings.horizontalPageBreakRepeat];
-    }
-    // Code to repeat the given column in split pages
-    horizontalPageBreakRepeat.forEach(function (field) {
-        var col = table.columns.find(function (item) { return item.dataKey === field || item.index === field; });
-        if (col && !repeatColumnsMap.has(col.index)) {
-            repeatColumnsMap.set(col.index, true);
-            colIndexes.push(col.index);
-            columns.push(table.columns[col.index]);
-            remainingWidth -= col.wrappedWidth;
-        }
-    });
-    var first = true;
-    var i = (_a = config === null || config === void 0 ? void 0 : config.start) !== null && _a !== void 0 ? _a : 0; // make sure couter is initiated outside the loop
-    while (i < table.columns.length) {
-        // Prevent duplicates
-        if (repeatColumnsMap.has(i)) {
-            i++;
-            continue;
-        }
-        var colWidth = table.columns[i].wrappedWidth;
-        // Take at least one column even if it doesn't fit
-        if (first || remainingWidth >= colWidth) {
-            first = false;
-            colIndexes.push(i);
-            columns.push(table.columns[i]);
-            remainingWidth -= colWidth;
-        }
-        else {
-            break;
-        }
-        i++;
-    }
-    return { colIndexes: colIndexes, columns: columns, lastIndex: i - 1 };
-}
-function calculateAllColumnsCanFitInPage(doc, table) {
-    var allResults = [];
-    for (var i = 0; i < table.columns.length; i++) {
-        var result = getColumnsCanFitInPage(doc, table, { start: i });
-        if (result.columns.length) {
-            allResults.push(result);
-            i = result.lastIndex;
-        }
-    }
-    return allResults;
-}
-exports.calculateAllColumnsCanFitInPage = calculateAllColumnsCanFitInPage;
-
-
-/***/ }),
-
-/***/ 788:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-
+// Custom table extensions for jsPDF-AutoTable, including support for text decorators and drawing by page
+// Also includes a new custom data format to make text decorators easier to use
 var __assign = (this && this.__assign) || function () {
     __assign = Object.assign || function(t) {
         for (var s, i = 1, n = arguments.length; i < n; i++) {
@@ -2408,8 +2291,17 @@ var __assign = (this && this.__assign) || function () {
     return __assign.apply(this, arguments);
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.delimitDataByPage = exports.parseContentSection = void 0;
+exports.drawSinglePageContent = exports.delimitDataByPage = exports.parseContentSection = exports.doAutoTable = void 0;
 var jspdf_1 = __webpack_require__(964);
+var tableDrawer_1 = __webpack_require__(664);
+var tableCalculator_1 = __webpack_require__(972);
+var inputParser_1 = __webpack_require__(776);
+function doAutoTable(d, options) {
+    var input = (0, inputParser_1.parseInput)(d, options);
+    var table = (0, tableCalculator_1.createTable)(d, input);
+    (0, tableDrawer_1.drawTable)(d, table);
+}
+exports.doAutoTable = doAutoTable;
 function classifyInput(data) {
     if (data.every(function (row) {
         if (Array.isArray(row)) {
@@ -2509,11 +2401,11 @@ function parseContentSection(section) {
     }
 }
 exports.parseContentSection = parseContentSection;
-function delimitDataByPage(submitOptions, autoTableCb) {
+function delimitDataByPage(submitOptions) {
     var tmpDoc = new jspdf_1.default();
     var firstLastElPerPage = [];
     var currentBounds = { page: 0, min: 0, max: Infinity };
-    autoTableCb(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
+    doAutoTable(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
             if (submitOptions.didDrawCell)
                 submitOptions.didDrawCell(data);
             if (currentBounds.page !== data.pageNumber) {
@@ -2538,6 +2430,125 @@ function delimitDataByPage(submitOptions, autoTableCb) {
     return firstLastElPerPage;
 }
 exports.delimitDataByPage = delimitDataByPage;
+function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
+    // Get page position
+    var pagePosition;
+    if (pageNumber === 0) {
+        pagePosition = 'start';
+    }
+    else if (pageNumber === totalPages - 1) {
+        pagePosition = 'end';
+    }
+    else {
+        pagePosition = 'middle';
+    }
+    var bodyContent = options.body;
+    var dataToDraw = bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.slice(bounds.min, bounds.max + 1);
+    var showHead = false;
+    var showFoot = false;
+    switch (pagePosition) {
+        case 'start':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showHead === 'firstPage')
+                showHead = true;
+            break;
+        case 'middle':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            break;
+        case 'end':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showFoot === 'lastPage')
+                showFoot = true;
+            break;
+    }
+    doAutoTable(d, __assign(__assign({}, options), { body: dataToDraw, showHead: showHead, showFoot: showFoot }));
+}
+exports.drawSinglePageContent = drawSinglePageContent;
+
+
+/***/ }),
+
+/***/ 224:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.calculateAllColumnsCanFitInPage = void 0;
+var common_1 = __webpack_require__(420);
+// get columns can be fit into page
+function getColumnsCanFitInPage(doc, table, config) {
+    var _a;
+    if (config === void 0) { config = {}; }
+    // Get page width
+    var remainingWidth = (0, common_1.getPageAvailableWidth)(doc, table);
+    // Get column data key to repeat
+    var repeatColumnsMap = new Map();
+    var colIndexes = [];
+    var columns = [];
+    var horizontalPageBreakRepeat = [];
+    table.settings.horizontalPageBreakRepeat;
+    if (Array.isArray(table.settings.horizontalPageBreakRepeat)) {
+        horizontalPageBreakRepeat = table.settings.horizontalPageBreakRepeat;
+        // It can be a single value of type string or number (even number: 0)
+    }
+    else if (typeof table.settings.horizontalPageBreakRepeat === 'string' ||
+        typeof table.settings.horizontalPageBreakRepeat === 'number') {
+        horizontalPageBreakRepeat = [table.settings.horizontalPageBreakRepeat];
+    }
+    // Code to repeat the given column in split pages
+    horizontalPageBreakRepeat.forEach(function (field) {
+        var col = table.columns.find(function (item) { return item.dataKey === field || item.index === field; });
+        if (col && !repeatColumnsMap.has(col.index)) {
+            repeatColumnsMap.set(col.index, true);
+            colIndexes.push(col.index);
+            columns.push(table.columns[col.index]);
+            remainingWidth -= col.wrappedWidth;
+        }
+    });
+    var first = true;
+    var i = (_a = config === null || config === void 0 ? void 0 : config.start) !== null && _a !== void 0 ? _a : 0; // make sure couter is initiated outside the loop
+    while (i < table.columns.length) {
+        // Prevent duplicates
+        if (repeatColumnsMap.has(i)) {
+            i++;
+            continue;
+        }
+        var colWidth = table.columns[i].wrappedWidth;
+        // Take at least one column even if it doesn't fit
+        if (first || remainingWidth >= colWidth) {
+            first = false;
+            colIndexes.push(i);
+            columns.push(table.columns[i]);
+            remainingWidth -= colWidth;
+        }
+        else {
+            break;
+        }
+        i++;
+    }
+    return { colIndexes: colIndexes, columns: columns, lastIndex: i - 1 };
+}
+function calculateAllColumnsCanFitInPage(doc, table) {
+    var allResults = [];
+    for (var i = 0; i < table.columns.length; i++) {
+        var result = getColumnsCanFitInPage(doc, table, { start: i });
+        if (result.columns.length) {
+            allResults.push(result);
+            i = result.lastIndex;
+        }
+    }
+    return allResults;
+}
+exports.calculateAllColumnsCanFitInPage = calculateAllColumnsCanFitInPage;
 
 
 /***/ }),

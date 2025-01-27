@@ -1,3 +1,6 @@
+// Custom table extensions for jsPDF-AutoTable, including support for text decorators and drawing by page
+// Also includes a new custom data format to make text decorators easier to use
+
 import jsPDF from 'jspdf'
 import {
   CellTextPartInput,
@@ -5,13 +8,25 @@ import {
   RowInput,
   UserOptions,
 } from './config'
-import autoTable from './main'
 import { CustomCellText, CustomCellTextLine } from './models'
+import { jsPDFDocument } from './documentHandler'
+import { drawTable as _drawTable } from './tableDrawer'
+import { createTable as _createTable } from './tableCalculator'
+import { parseInput } from './inputParser'
+
+export function doAutoTable(d: jsPDFDocument, options: UserOptions) {
+  const input = parseInput(d, options)
+  const table = _createTable(d, input)
+  _drawTable(d, table)
+}
 
 type CustomCellTextGrid = CustomCellText[][] // Multi-row, multi-column
 
 type InputFormat = 'normal' | 'custom'
-function classifyInput(data: CustomTableInputSyntax | RowInput[]): InputFormat {
+function classifyInput(data: CustomTableInputSyntax): 'custom'
+function classifyInput(data: RowInput[]): 'normal'
+function classifyInput(data: RowInput[] | CustomTableInputSyntax): InputFormat
+function classifyInput(data: RowInput[] | CustomTableInputSyntax): InputFormat {
   if (
     data.every((row) => {
       if (Array.isArray(row)) {
@@ -137,16 +152,13 @@ export function parseContentSection(
   }
 }
 
-export function delimitDataByPage(
-  submitOptions: UserOptions,
-  autoTableCb: typeof autoTable,
-) {
+export function delimitDataByPage(submitOptions: UserOptions) {
   const tmpDoc = new jsPDF()
 
   const firstLastElPerPage: { min: number; max: number }[] = []
   let currentBounds = { page: 0, min: 0, max: Infinity }
 
-  autoTableCb(tmpDoc, {
+  doAutoTable(tmpDoc, {
     ...submitOptions,
     didDrawCell: (data) => {
       if (submitOptions.didDrawCell) submitOptions.didDrawCell(data)
@@ -172,4 +184,53 @@ export function delimitDataByPage(
 
   firstLastElPerPage.push({ min: currentBounds.min, max: currentBounds.max })
   return firstLastElPerPage
+}
+
+export function drawSinglePageContent(
+  d: jsPDFDocument,
+  options: UserOptions,
+  bounds: { min: number; max: number },
+  pageNumber: number,
+  totalPages: number,
+) {
+  // Get page position
+  let pagePosition: 'start' | 'middle' | 'end'
+  if (pageNumber === 0) {
+    pagePosition = 'start'
+  } else if (pageNumber === totalPages - 1) {
+    pagePosition = 'end'
+  } else {
+    pagePosition = 'middle'
+  }
+
+  const bodyContent = options.body
+  const dataToDraw = bodyContent?.slice(bounds.min, bounds.max + 1)
+
+  let showHead = false
+  let showFoot = false
+  switch (pagePosition) {
+    case 'start':
+      if (options.showHead === 'everyPage') showHead = true
+      if (options.showFoot === 'everyPage') showFoot = true
+
+      if (options.showHead === 'firstPage') showHead = true
+      break
+    case 'middle':
+      if (options.showHead === 'everyPage') showHead = true
+      if (options.showFoot === 'everyPage') showFoot = true
+      break
+    case 'end':
+      if (options.showHead === 'everyPage') showHead = true
+      if (options.showFoot === 'everyPage') showFoot = true
+
+      if (options.showFoot === 'lastPage') showFoot = true
+      break
+  }
+
+  doAutoTable(d, {
+    ...options,
+    body: dataToDraw,
+    showHead,
+    showFoot,
+  })
 }

@@ -335,16 +335,30 @@ export type RowInput = {
 export type autoTable = (options: UserOptions) => void;
 export declare function applyPlugin(jsPDF: jsPDFConstructor): void;
 declare function autoTable(d: jsPDFDocument, options: UserOptions): void;
+export type DrawByPageMeta = {
+	/**
+	 * Draw the table to the current page in the provided document
+	 * @returns true if there is another page to draw after this current one, false otherwise
+	 */
+	drawNextPage: (d: jsPDFDocument) => boolean;
+	numPages: number;
+};
 /**
  * run autoTable with a custom syntax that supports certain
  * text decoration, such as: bold, italics, and super/subscripts
  *
  * Optionally supports drawing by page
  */
-export declare function autoTableWithTextDecorators(d: jsPDFDocument, options: TextDecoratorUserOptions, drawByPage: true): {
-	drawNextPage: () => boolean;
-};
-export declare function autoTableWithTextDecorators(d: jsPDFDocument, options: TextDecoratorUserOptions, drawByPage?: false): void;
+export declare function autoTableWithTextDecorators(
+/**
+ * Set to true to enable draw-by-page mode
+ */
+d: jsPDFDocument, options: TextDecoratorUserOptions): void;
+export declare function autoTableWithTextDecorators(
+/**
+ * Pass a JsPDF instance to draw the table to the document and disable draw-by-page mode
+ */
+drawByPage: true, options: TextDecoratorUserOptions): DrawByPageMeta;
 declare function __createTable(d: jsPDFDocument, options: UserOptions): Table;
 declare function __drawTable(d: jsPDFDocument, table: Table): void;
 

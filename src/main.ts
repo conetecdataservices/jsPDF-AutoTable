@@ -9,7 +9,12 @@ import { createTable as _createTable } from './tableCalculator'
 import { CellHook, Table } from './models'
 import { CellHookData } from './HookData'
 import { Cell, Column, Row } from './models'
-import { delimitDataByPage, parseContentSection } from './textDecorators'
+import {
+  delimitDataByPage,
+  doAutoTable,
+  drawSinglePageContent,
+  parseContentSection,
+} from './tableExtensions'
 
 export type autoTable = (options: UserOptions) => void
 
@@ -20,58 +25,16 @@ export function applyPlugin(jsPDF: jsPDFConstructor) {
 }
 
 function autoTable(d: jsPDFDocument, options: UserOptions) {
-  const input = parseInput(d, options)
-  const table = _createTable(d, input)
-  _drawTable(d, table)
+  doAutoTable(d, options)
 }
 
-function drawSinglePageContent(
-  d: jsPDFDocument,
-  options: UserOptions,
-  bounds: { min: number; max: number },
-  pageNumber: number,
-  totalPages: number,
-) {
-  // Get page position
-  let pagePosition: 'start' | 'middle' | 'end'
-  if (pageNumber === 0) {
-    pagePosition = 'start'
-  } else if (pageNumber === totalPages - 1) {
-    pagePosition = 'end'
-  } else {
-    pagePosition = 'middle'
-  }
-
-  const bodyContent = options.body
-  const dataToDraw = bodyContent?.slice(bounds.min, bounds.max + 1)
-
-  let showHead = false
-  let showFoot = false
-  switch (pagePosition) {
-    case 'start':
-      if (options.showHead === 'everyPage') showHead = true
-      if (options.showFoot === 'everyPage') showFoot = true
-
-      if (options.showHead === 'firstPage') showHead = true
-      break
-    case 'middle':
-      if (options.showHead === 'everyPage') showHead = true
-      if (options.showFoot === 'everyPage') showFoot = true
-      break
-    case 'end':
-      if (options.showHead === 'everyPage') showHead = true
-      if (options.showFoot === 'everyPage') showFoot = true
-
-      if (options.showFoot === 'lastPage') showFoot = true
-      break
-  }
-
-  autoTable(d, {
-    ...options,
-    body: dataToDraw,
-    showHead,
-    showFoot,
-  })
+export type DrawByPageMeta = {
+  /**
+   * Draw the table to the current page in the provided document
+   * @returns true if there is another page to draw after this current one, false otherwise
+   */
+  drawNextPage: (d: jsPDFDocument) => boolean
+  numPages: number
 }
 
 /**
@@ -81,20 +44,23 @@ function drawSinglePageContent(
  * Optionally supports drawing by page
  */
 function autoTableWithTextDecorators(
+  /**
+   * Set to true to enable draw-by-page mode
+   */
   d: jsPDFDocument,
   options: TextDecoratorUserOptions,
-  drawByPage: true,
-): { drawNextPage: () => boolean }
-function autoTableWithTextDecorators(
-  d: jsPDFDocument,
-  options: TextDecoratorUserOptions,
-  drawByPage?: false,
 ): void
 function autoTableWithTextDecorators(
-  d: jsPDFDocument,
+  /**
+   * Pass a JsPDF instance to draw the table to the document and disable draw-by-page mode
+   */
+  drawByPage: true,
   options: TextDecoratorUserOptions,
-  drawByPage?: boolean,
-): void | { drawNextPage: () => boolean } {
+): DrawByPageMeta
+function autoTableWithTextDecorators(
+  documentOrDrawByPage: jsPDFDocument | true,
+  options: TextDecoratorUserOptions,
+): void | DrawByPageMeta {
   const headContent = parseContentSection(options.head)
   const bodyContent = parseContentSection(options.body)
   const footContent = parseContentSection(options.foot)
@@ -125,29 +91,30 @@ function autoTableWithTextDecorators(
         : options.willDrawCell,
   }
 
-  if (drawByPage !== true) {
-    return autoTable(d, submitOptions)
+  if (documentOrDrawByPage !== true) {
+    return autoTable(documentOrDrawByPage, submitOptions)
   }
 
   // Draw by page
-  const pageDelimits = delimitDataByPage(submitOptions, autoTable)
+  const pageDelimits = delimitDataByPage(submitOptions)
   const iterator = pageDelimits.entries()
 
   return {
-    drawNextPage: () => {
+    numPages: pageDelimits.length,
+    drawNextPage: (document) => {
       const pageBounds = iterator.next()
 
-      if (pageBounds.done) return false
+      if (!pageBounds.done) {
+        drawSinglePageContent(
+          document,
+          submitOptions,
+          pageBounds.value[1],
+          pageBounds.value[0],
+          pageDelimits.length,
+        )
+      }
 
-      drawSinglePageContent(
-        d,
-        submitOptions,
-        pageBounds.value[1],
-        pageBounds.value[0],
-        pageDelimits.length,
-      )
-
-      return true
+      return !pageBounds.done
     },
   }
 }
