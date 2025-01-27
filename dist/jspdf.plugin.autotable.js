@@ -2303,10 +2303,15 @@ function doAutoTable(d, options) {
 }
 exports.doAutoTable = doAutoTable;
 function classifyInput(data) {
-    if (data.every(function (row) {
+    if (data.some(function (row) {
         if (Array.isArray(row)) {
-            row.every(function (cell) {
-                return typeof cell === 'string' || typeof cell === 'object';
+            return row.some(function (cell) {
+                var normalized = Array.isArray(cell) ? cell : [cell];
+                return normalized.some(function (cellPart) {
+                    return (cellPart !== null &&
+                        typeof cellPart === 'object' &&
+                        'text' in cellPart);
+                });
             });
         }
         return false;

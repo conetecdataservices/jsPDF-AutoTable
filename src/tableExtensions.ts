@@ -28,10 +28,18 @@ function classifyInput(data: RowInput[]): 'normal'
 function classifyInput(data: RowInput[] | CustomTableInputSyntax): InputFormat
 function classifyInput(data: RowInput[] | CustomTableInputSyntax): InputFormat {
   if (
-    data.every((row) => {
+    data.some((row) => {
       if (Array.isArray(row)) {
-        row.every((cell) => {
-          return typeof cell === 'string' || typeof cell === 'object'
+        return row.some((cell) => {
+          const normalized = Array.isArray(cell) ? cell : [cell]
+
+          return normalized.some((cellPart) => {
+            return (
+              cellPart !== null &&
+              typeof cellPart === 'object' &&
+              'text' in cellPart
+            )
+          })
         })
       }
 
