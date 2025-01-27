@@ -1337,25 +1337,15 @@ function autoTableWithTextDecorators(documentOrDrawByPage, options) {
     var headContent = (0, tableExtensions_1.parseContentSection)(options.head);
     var bodyContent = (0, tableExtensions_1.parseContentSection)(options.body);
     var footContent = (0, tableExtensions_1.parseContentSection)(options.foot);
-    var contentConverterHook = function (data) {
-        if (options.willDrawCell)
-            options.willDrawCell(data);
-        if (data.section === 'head' && (headContent === null || headContent === void 0 ? void 0 : headContent.customStyles)) {
-            data.cell.text =
-                headContent === null || headContent === void 0 ? void 0 : headContent.customStyles[data.row.index][data.column.index];
-        }
-        else if (data.section === 'body' && (bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.customStyles)) {
-            data.cell.text =
-                bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.customStyles[data.row.index][data.column.index];
-        }
-        else if (data.section === 'foot' && (footContent === null || footContent === void 0 ? void 0 : footContent.customStyles)) {
-            data.cell.text =
-                footContent === null || footContent === void 0 ? void 0 : footContent.customStyles[data.row.index][data.column.index];
-        }
-    };
-    var submitOptions = __assign(__assign({}, options), { head: headContent === null || headContent === void 0 ? void 0 : headContent.compat, body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.compat, foot: footContent === null || footContent === void 0 ? void 0 : footContent.compat, willDrawCell: headContent || bodyContent || footContent
-            ? contentConverterHook
-            : options.willDrawCell });
+    var submitOptions = __assign(__assign({}, options), { head: headContent === null || headContent === void 0 ? void 0 : headContent.compat, body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.compat, foot: footContent === null || footContent === void 0 ? void 0 : footContent.compat, willDrawCell: function (data) {
+            if (options.willDrawCell)
+                options.willDrawCell(data);
+            (0, tableExtensions_1.makeContentConverterHook)({
+                head: headContent === null || headContent === void 0 ? void 0 : headContent.customStyles,
+                body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.customStyles,
+                foot: footContent === null || footContent === void 0 ? void 0 : footContent.customStyles,
+            })(data);
+        } });
     if (documentOrDrawByPage !== true) {
         return autoTable(documentOrDrawByPage, submitOptions);
     }
@@ -1367,7 +1357,11 @@ function autoTableWithTextDecorators(documentOrDrawByPage, options) {
         drawNextPage: function (document) {
             var pageBounds = iterator.next();
             if (!pageBounds.done) {
-                (0, tableExtensions_1.drawSinglePageContent)(document, submitOptions, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
+                (0, tableExtensions_1.drawSinglePageContent)(document, submitOptions, {
+                    body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.customStyles,
+                    head: headContent === null || headContent === void 0 ? void 0 : headContent.customStyles,
+                    foot: footContent === null || footContent === void 0 ? void 0 : footContent.customStyles,
+                }, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
             }
             return !pageBounds.done;
         },
@@ -2291,7 +2285,7 @@ var __assign = (this && this.__assign) || function () {
     return __assign.apply(this, arguments);
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.drawSinglePageContent = exports.delimitDataByPage = exports.parseContentSection = exports.doAutoTable = void 0;
+exports.drawSinglePageContent = exports.delimitDataByPage = exports.makeContentConverterHook = exports.parseContentSection = exports.doAutoTable = void 0;
 var jspdf_1 = __webpack_require__(964);
 var tableDrawer_1 = __webpack_require__(664);
 var tableCalculator_1 = __webpack_require__(972);
@@ -2406,6 +2400,20 @@ function parseContentSection(section) {
     }
 }
 exports.parseContentSection = parseContentSection;
+function makeContentConverterHook(contentSections) {
+    return function (data) {
+        if (data.section === 'head' && (contentSections === null || contentSections === void 0 ? void 0 : contentSections.head)) {
+            data.cell.text = contentSections.head[data.row.index][data.column.index];
+        }
+        else if (data.section === 'body' && (contentSections === null || contentSections === void 0 ? void 0 : contentSections.body)) {
+            data.cell.text = contentSections.body[data.row.index][data.column.index];
+        }
+        else if (data.section === 'foot' && (contentSections === null || contentSections === void 0 ? void 0 : contentSections.foot)) {
+            data.cell.text = contentSections.foot[data.row.index][data.column.index];
+        }
+    };
+}
+exports.makeContentConverterHook = makeContentConverterHook;
 function delimitDataByPage(submitOptions) {
     var tmpDoc = new jspdf_1.default();
     var firstLastElPerPage = [];
@@ -2413,6 +2421,8 @@ function delimitDataByPage(submitOptions) {
     doAutoTable(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
             if (submitOptions.didDrawCell)
                 submitOptions.didDrawCell(data);
+            if (data.row.section !== 'body')
+                return;
             if (currentBounds.page !== data.pageNumber) {
                 if (currentBounds.page !== 0) {
                     firstLastElPerPage.push({
@@ -2435,7 +2445,8 @@ function delimitDataByPage(submitOptions) {
     return firstLastElPerPage;
 }
 exports.delimitDataByPage = delimitDataByPage;
-function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
+function drawSinglePageContent(d, options, contentSections, bounds, pageNumber, totalPages) {
+    var _a, _b, _c, _d;
     // Get page position
     var pagePosition;
     if (pageNumber === 0) {
@@ -2447,8 +2458,10 @@ function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
     else {
         pagePosition = 'middle';
     }
-    var bodyContent = options.body;
-    var dataToDraw = bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.slice(bounds.min, bounds.max + 1);
+    var bodyContentToDraw = (_a = options.body) === null || _a === void 0 ? void 0 : _a.slice(bounds.min, bounds.max + 1);
+    var bodyReplacementContent = (_b = contentSections.body) === null || _b === void 0 ? void 0 : _b.slice(bounds.min, bounds.max + 1);
+    var headReplacementContent = (_c = contentSections.head) === null || _c === void 0 ? void 0 : _c.slice(bounds.min, bounds.max + 1);
+    var footReplacementContent = (_d = contentSections.foot) === null || _d === void 0 ? void 0 : _d.slice(bounds.min, bounds.max + 1);
     var showHead = false;
     var showFoot = false;
     switch (pagePosition) {
@@ -2475,7 +2488,15 @@ function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
                 showFoot = true;
             break;
     }
-    doAutoTable(d, __assign(__assign({}, options), { body: dataToDraw, showHead: showHead, showFoot: showFoot }));
+    doAutoTable(d, __assign(__assign({}, options), { body: bodyContentToDraw, showHead: showHead, showFoot: showFoot, willDrawCell: function (data) {
+            if (options.willDrawCell)
+                options.willDrawCell(data);
+            makeContentConverterHook({
+                head: headReplacementContent,
+                body: bodyReplacementContent,
+                foot: footReplacementContent,
+            })(data);
+        } }));
 }
 exports.drawSinglePageContent = drawSinglePageContent;
 
