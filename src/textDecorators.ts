@@ -5,15 +5,41 @@ import {
   RowInput,
   UserOptions,
 } from './config'
+import autoTable from './main'
 import { CustomCellText, CustomCellTextLine } from './models'
-import type autoTable from './main'
 
 type CustomCellTextGrid = CustomCellText[][] // Multi-row, multi-column
+
+type InputFormat = 'normal' | 'custom'
+function classifyInput(data: CustomTableInputSyntax | RowInput[]): InputFormat {
+  if (
+    data.every((row) => {
+      if (Array.isArray(row)) {
+        row.every((cell) => {
+          return typeof cell === 'string' || typeof cell === 'object'
+        })
+      }
+
+      return false
+    })
+  ) {
+    return 'custom'
+  }
+
+  return 'normal'
+}
 
 /**
  * Converts decorator syntax into the syntax used by the drawTable function
  */
-function parseBodyToCompat(data: CustomTableInputSyntax): RowInput[] {
+function parseBodyToCompat<Format extends InputFormat>(
+  format: Format,
+  data: Format extends 'normal' ? RowInput[] : CustomTableInputSyntax,
+): RowInput[] {
+  if (format === 'normal') {
+    return data as RowInput[]
+  }
+
   return (data as CustomTableInputSyntax).map((row) => {
     return row.map((cell) => {
       if (Array.isArray(cell)) {
@@ -83,7 +109,9 @@ function normalizeCustomCellStyles(
   })
 }
 
-export function parseContentSection(section?: CustomTableInputSyntax):
+export function parseContentSection(
+  section?: RowInput[] | CustomTableInputSyntax,
+):
   | {
       compat: RowInput[]
       customStyles?: CustomCellTextGrid
@@ -91,11 +119,21 @@ export function parseContentSection(section?: CustomTableInputSyntax):
   | undefined {
   if (!section) return undefined
 
-  const rowInput = parseBodyToCompat(section)
+  const format = classifyInput(section)
 
-  return {
-    compat: rowInput,
-    customStyles: normalizeCustomCellStyles(section as CustomTableInputSyntax),
+  const rowInput = parseBodyToCompat(format, section)
+
+  if (format === 'custom') {
+    return {
+      compat: rowInput,
+      customStyles: normalizeCustomCellStyles(
+        section as CustomTableInputSyntax,
+      ),
+    }
+  } else {
+    return {
+      compat: rowInput,
+    }
   }
 }
 
