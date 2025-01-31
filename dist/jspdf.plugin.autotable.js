@@ -275,7 +275,7 @@ function getCellLineUnitWidth(doc, text, x, y, lineHeight, ignoreScripts) {
                 acc_1 += doc.getStringUnitWidth(part);
             }
             else {
-                if (!ignoreScripts && part.script !== undefined) {
+                if (ignoreScripts && part.script !== undefined) {
                     return;
                 }
                 acc_1 += doc.getStringUnitWidth(part.text);

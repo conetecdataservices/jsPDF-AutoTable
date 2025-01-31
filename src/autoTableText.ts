@@ -150,7 +150,7 @@ function getCellLineUnitWidth(
       if (typeof part === 'string') {
         acc += doc.getStringUnitWidth(part)
       } else {
-        if (!ignoreScripts && part.script !== undefined) {
+        if (ignoreScripts && part.script !== undefined) {
           return
         }
         acc += doc.getStringUnitWidth(part.text)
