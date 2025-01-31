@@ -2585,7 +2585,7 @@ function autoTableWithTextDecorators(documentOrDrawByPage, options) {
     var pageDelimits = delimitDataByPage(submitOptions);
     var iterator = pageDelimits.entries();
     return {
-        numPages: pageDelimits.length,
+        pageDelimits: pageDelimits,
         drawNextPage: function (document) {
             var pageBounds = iterator.next();
             if (!pageBounds.done) {

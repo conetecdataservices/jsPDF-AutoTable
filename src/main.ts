@@ -35,7 +35,10 @@ export type DrawByPageMeta = {
    * @returns true if there is another page to draw after this current one, false otherwise
    */
   drawNextPage: (d: jsPDFDocument) => boolean
-  numPages: number
+  /**
+   * Indicates the row delimits for each page rendered (inclusive-inclusive)
+   */
+  pageDelimits: { min: number; max: number }[]
 }
 
 /**
@@ -91,7 +94,7 @@ function autoTableWithTextDecorators(
   const iterator = pageDelimits.entries()
 
   return {
-    numPages: pageDelimits.length,
+    pageDelimits,
     drawNextPage: (document) => {
       const pageBounds = iterator.next()
 
