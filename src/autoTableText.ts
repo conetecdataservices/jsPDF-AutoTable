@@ -140,6 +140,7 @@ function getCellLineUnitWidth(
   x: number,
   y: number,
   lineHeight: number,
+  ignoreScripts?: boolean,
 ) {
   if (typeof text === 'string') {
     return doc.getStringUnitWidth(text)
@@ -149,6 +150,9 @@ function getCellLineUnitWidth(
       if (typeof part === 'string') {
         acc += doc.getStringUnitWidth(part)
       } else {
+        if (!ignoreScripts && part.script !== undefined) {
+          return
+        }
         acc += doc.getStringUnitWidth(part.text)
       }
     })
@@ -209,7 +213,14 @@ export default function (
           doc,
           textContent,
           x -
-            getCellLineUnitWidth(doc, textContent, x, y, lineHeight) *
+            getCellLineUnitWidth(
+              doc,
+              textContent,
+              x,
+              y,
+              lineHeight,
+              styles.halign === 'center',
+            ) *
               alignSize,
           y,
           lineHeight,
@@ -218,7 +229,15 @@ export default function (
       }
       return doc
     }
-    x -= getCellLineUnitWidth(doc, text as string, x, y, lineHeight) * alignSize
+    x -=
+      getCellLineUnitWidth(
+        doc,
+        text as string,
+        x,
+        y,
+        lineHeight,
+        styles.halign === 'center',
+      ) * alignSize
   }
 
   if (styles.halign === 'justify') {
