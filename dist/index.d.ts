@@ -335,6 +335,10 @@ export type RowInput = {
 export type autoTable = (options: UserOptions) => void;
 export declare function applyPlugin(jsPDF: jsPDFConstructor): void;
 declare function autoTable(d: jsPDFDocument, options: UserOptions): void;
+export type PageRowDelimit = {
+	min: number;
+	max: number;
+};
 export type DrawByPageMeta = {
 	/**
 	 * Draw the table to the current page in the provided document
@@ -344,10 +348,11 @@ export type DrawByPageMeta = {
 	/**
 	 * Indicates the row delimits for each page rendered (inclusive-inclusive)
 	 */
-	pageDelimits: {
-		min: number;
-		max: number;
-	}[];
+	pageDelimits: PageRowDelimit[];
+	/**
+	 * Modify the row delimits for each page rendered
+	 */
+	modifyDelimits: (newBounds: PageRowDelimit[]) => void;
 };
 /**
  * run autoTable with a custom syntax that supports certain

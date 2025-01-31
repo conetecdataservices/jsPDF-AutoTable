@@ -29,6 +29,7 @@ function autoTable(d: jsPDFDocument, options: UserOptions) {
   doAutoTable(d, options)
 }
 
+type PageRowDelimit = { min: number; max: number }
 export type DrawByPageMeta = {
   /**
    * Draw the table to the current page in the provided document
@@ -38,7 +39,11 @@ export type DrawByPageMeta = {
   /**
    * Indicates the row delimits for each page rendered (inclusive-inclusive)
    */
-  pageDelimits: { min: number; max: number }[]
+  pageDelimits: PageRowDelimit[]
+  /**
+   * Modify the row delimits for each page rendered
+   */
+  modifyDelimits: (newBounds: PageRowDelimit[]) => void
 }
 
 /**
@@ -90,11 +95,16 @@ function autoTableWithTextDecorators(
   }
 
   // Draw by page
-  const pageDelimits = delimitDataByPage(submitOptions)
-  const iterator = pageDelimits.entries()
+  let pageDelimits = delimitDataByPage(submitOptions)
+  let iterator = pageDelimits.entries()
 
   return {
     pageDelimits,
+    modifyDelimits: (newBounds: PageRowDelimit[]) => {
+      // TODO, future validation?
+      pageDelimits = newBounds
+      iterator = pageDelimits.entries()
+    },
     drawNextPage: (document) => {
       const pageBounds = iterator.next()
 
