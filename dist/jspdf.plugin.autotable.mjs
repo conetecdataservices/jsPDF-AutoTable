@@ -516,7 +516,7 @@ function doThePrint(doc, text, x, y, lineHeight, options) {
         }
     });
 }
-function getCellLineUnitWidth(doc, text, x, y, lineHeight) {
+function getCellLineUnitWidth(doc, text, x, y, lineHeight, ignoreScripts) {
     if (typeof text === 'string') {
         return doc.getStringUnitWidth(text);
     }
@@ -527,6 +527,9 @@ function getCellLineUnitWidth(doc, text, x, y, lineHeight) {
                 acc_1 += doc.getStringUnitWidth(part);
             }
             else {
+                if (!ignoreScripts && part.script !== undefined) {
+                    return;
+                }
                 acc_1 += doc.getStringUnitWidth(part.text);
             }
         });
@@ -570,13 +573,14 @@ function autoTableText (text, x, y, styles, doc) {
             for (var iLine = 0; iLine < splitText.length; iLine++) {
                 var textContent = splitText[iLine];
                 doThePrint(doc, textContent, x -
-                    getCellLineUnitWidth(doc, textContent, x, y, lineHeight) *
+                    getCellLineUnitWidth(doc, textContent, x, y, lineHeight, styles.halign === 'center') *
                         alignSize, y, lineHeight);
                 y += lineHeight;
             }
             return doc;
         }
-        x -= getCellLineUnitWidth(doc, text, x, y, lineHeight) * alignSize;
+        x -=
+            getCellLineUnitWidth(doc, text, x, y, lineHeight, styles.halign === 'center') * alignSize;
     }
     if (styles.halign === 'justify') {
         doThePrint(doc, text, x, y, lineHeight, {
