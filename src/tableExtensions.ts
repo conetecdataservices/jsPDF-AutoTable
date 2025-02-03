@@ -93,7 +93,13 @@ function parsePart(part: CellTextPartInput): CustomCellTextLine {
     }))
   }
 
-  return parts.filter((p) => p.text.trim().length > 0)
+  return (
+    parts
+      // Remove malformed parts (empty strings)
+      .filter((p) => p.text)
+      // Remove newline markers, as that is now represented as an array
+      .map((p) => (p.text.match(splitter) ? { ...p, text: '' } : p))
+  )
 }
 
 /**
