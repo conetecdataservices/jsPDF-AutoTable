@@ -51,7 +51,7 @@ function applyCustomCellStyling(
         position.y -= scriptOffset
         break
       case 'sub':
-        position.y += scriptOffset
+        position.y += scriptOffset / 3
         break
     }
   }
@@ -219,7 +219,7 @@ export default function (
               x,
               y,
               lineHeight,
-              styles.halign === 'center',
+              styles.ignoreScriptsInWidthCalc && styles.halign === 'center',
             ) *
               alignSize,
           y,
@@ -236,7 +236,7 @@ export default function (
         x,
         y,
         lineHeight,
-        styles.halign === 'center',
+        styles.ignoreScriptsInWidthCalc && styles.halign === 'center',
       ) * alignSize
   }
 
@@ -255,5 +255,6 @@ export default function (
 export interface TextStyles {
   valign?: 'middle' | 'bottom' | 'top'
   halign?: 'justify' | 'center' | 'right' | 'left'
+  ignoreScriptsInWidthCalc?: boolean
   maxWidth?: number
 }
