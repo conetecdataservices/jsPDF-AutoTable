@@ -93,13 +93,26 @@ function parsePart(part: CellTextPartInput): CustomCellTextLine {
     }))
   }
 
-  return (
-    parts
-      // Remove malformed parts (empty strings)
-      .filter((p) => p.text)
-      // Remove newline markers, as that is now represented as an array
-      .map((p) => (p.text.match(splitter) ? { ...p, text: '' } : p))
-  )
+  // Remove newline entries
+  // Keep newlines up to the first proper text content so that text like "\n\ntest" works as expected
+  const filtered: CustomCellTextLine = []
+  let realContentFound = false
+  parts
+    .filter((p) => p.text !== '')
+    .forEach((p) => {
+      const pFilt = p.text.replace(splitter, '')
+      if (pFilt.length === 0) {
+        if (!realContentFound) filtered.push({ text: pFilt })
+      } else {
+        realContentFound = true //
+        filtered.push({
+          ...p,
+          text: pFilt,
+        })
+      }
+    })
+
+  return filtered
 }
 
 /**

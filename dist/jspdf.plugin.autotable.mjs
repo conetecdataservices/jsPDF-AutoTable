@@ -2417,11 +2417,24 @@ function parsePart(part) {
             script: part.script,
         }); });
     }
-    return (parts
-        // Remove malformed parts (empty strings)
-        .filter(function (p) { return p.text; })
-        // Remove newline markers, as that is now represented as an array
-        .map(function (p) { return (p.text.match(splitter) ? __assign(__assign({}, p), { text: '' }) : p); }));
+    // Remove newline entries
+    // Keep newlines up to the first proper text content so that text like "\n\ntest" works as expected
+    var filtered = [];
+    var realContentFound = false;
+    parts
+        .filter(function (p) { return p.text !== ''; })
+        .forEach(function (p) {
+        var pFilt = p.text.replace(splitter, '');
+        if (pFilt.length === 0) {
+            if (!realContentFound)
+                filtered.push({ text: pFilt });
+        }
+        else {
+            realContentFound = true; //
+            filtered.push(__assign(__assign({}, p), { text: pFilt }));
+        }
+    });
+    return filtered;
 }
 /**
  * Normalize (string | object) cells to just object type
