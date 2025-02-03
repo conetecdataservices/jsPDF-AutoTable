@@ -303,6 +303,7 @@ function defaultStyles(scaleFactor) {
         textColor: 20,
         halign: 'left', // left, center, right, justify
         valign: 'top', // top, middle, bottom
+        ignoreScriptsInWidthCalc: false,
         fontSize: 10,
         cellPadding: 5 / scaleFactor, // number or {top,left,right,left,vertical,horizontal}
         lineColor: 200,
@@ -455,7 +456,7 @@ function applyCustomCellStyling(doc, style, position) {
                 position.y -= scriptOffset;
                 break;
             case 'sub':
-                position.y += scriptOffset;
+                position.y += scriptOffset / 3;
                 break;
         }
     }
@@ -573,14 +574,14 @@ function autoTableText (text, x, y, styles, doc) {
             for (var iLine = 0; iLine < splitText.length; iLine++) {
                 var textContent = splitText[iLine];
                 doThePrint(doc, textContent, x -
-                    getCellLineUnitWidth(doc, textContent, x, y, lineHeight, styles.halign === 'center') *
+                    getCellLineUnitWidth(doc, textContent, x, y, lineHeight, styles.ignoreScriptsInWidthCalc && styles.halign === 'center') *
                         alignSize, y, lineHeight);
                 y += lineHeight;
             }
             return doc;
         }
         x -=
-            getCellLineUnitWidth(doc, text, x, y, lineHeight, styles.halign === 'center') * alignSize;
+            getCellLineUnitWidth(doc, text, x, y, lineHeight, styles.ignoreScriptsInWidthCalc && styles.halign === 'center') * alignSize;
     }
     if (styles.halign === 'justify') {
         doThePrint(doc, text, x, y, lineHeight, {
@@ -1682,6 +1683,7 @@ function printRow(doc, table, row, cursor, columns) {
         autoTableText(cell.text, textPos.x, textPos.y, {
             halign: cell.styles.halign,
             valign: cell.styles.valign,
+            ignoreScriptsInWidthCalc: cell.styles.ignoreScriptsInWidthCalc,
             maxWidth: Math.ceil(cell.width - cell.padding('left') - cell.padding('right')),
         }, doc.getDocument());
         table.callCellHooks(doc, table.hooks.didDrawCell, cell, row, column, cursor);
@@ -2415,7 +2417,11 @@ function parsePart(part) {
             script: part.script,
         }); });
     }
-    return parts.filter(function (p) { return p.text.trim().length > 0; });
+    return (parts
+        // Remove malformed parts (empty strings)
+        .filter(function (p) { return p.text; })
+        // Remove newline markers, as that is now represented as an array
+        .map(function (p) { return (p.text.match(splitter) ? __assign(__assign({}, p), { text: '' }) : p); }));
 }
 /**
  * Normalize (string | object) cells to just object type

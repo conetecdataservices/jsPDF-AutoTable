@@ -233,6 +233,13 @@ export interface Styles {
 	textColor: Color;
 	halign: HAlignType;
 	valign: VAlignType;
+	/**
+	 * When applicable (ie using custom table syntax and halign is center
+	 * Choose to include or omit script symbols
+	 *
+	 * (script width must be included for right-align and unnecessary for left-align)
+	 */
+	ignoreScriptsInWidthCalc: boolean;
 	fontSize: number;
 	cellPadding: MarginPaddingInput;
 	lineColor: Color;
