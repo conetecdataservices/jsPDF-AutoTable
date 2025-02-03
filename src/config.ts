@@ -29,6 +29,13 @@ export interface Styles {
   textColor: Color
   halign: HAlignType
   valign: VAlignType
+  /**
+   * When applicable (ie using custom table syntax and halign is center
+   * Choose to include or omit script symbols
+   *
+   * (script width must be included for right-align and unnecessary for left-align)
+   */
+  ignoreScriptsInWidthCalc: boolean
   fontSize: number
   cellPadding: MarginPaddingInput
   lineColor: Color
@@ -162,6 +169,7 @@ export function defaultStyles(scaleFactor: number): Styles {
     textColor: 20,
     halign: 'left', // left, center, right, justify
     valign: 'top', // top, middle, bottom
+    ignoreScriptsInWidthCalc: false,
     fontSize: 10,
     cellPadding: 5 / scaleFactor, // number or {top,left,right,left,vertical,horizontal}
     lineColor: 200,
