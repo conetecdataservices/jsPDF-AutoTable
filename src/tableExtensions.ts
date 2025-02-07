@@ -134,7 +134,6 @@ function normalizeCustomCellStyles(
       cellNormalized.forEach((part) => {
         // Returns line-breaks as separate parts
         const processed = parsePart(part)
-        if (processed.length === 0) throw Error('Bad')
 
         processed.forEach((processedPart, i) => {
           if (i !== 0) {

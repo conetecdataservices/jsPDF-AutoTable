@@ -2451,8 +2451,6 @@ function normalizeCustomCellStyles(styledData) {
             cellNormalized.forEach(function (part) {
                 // Returns line-breaks as separate parts
                 var processed = parsePart(part);
-                if (processed.length === 0)
-                    throw Error('Bad');
                 processed.forEach(function (processedPart, i) {
                     if (i !== 0) {
                         lines.push(currentLine);
