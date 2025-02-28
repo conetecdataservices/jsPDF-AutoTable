@@ -11,9 +11,9 @@ import { parseInput } from '../inputParser'
 import {
   classifyTableInput,
   CustomCellTextGrid,
-  getCapacityFigureForPage,
+  getCapacityFigureForPage as getCapacityFigureForPagePosition,
   normalizeCustomCellStyles,
-  PageBodyRowCapacities,
+  PageAppearanceBodyRowCapacities,
   PagePosition,
   parseTableInputToCompat,
 } from './helpers'
@@ -76,7 +76,7 @@ export function makeContentConverterHook(
 function getPageBodyRowsCapacity(
   userOptions: UserOptions,
   jsPDFOptions: jsPDFOptions,
-): PageBodyRowCapacities {
+): PageAppearanceBodyRowCapacities {
   const appearanceModifiers = [
     // None
     [false, false],
@@ -135,10 +135,18 @@ function getPageBodyRowsCapacity(
 }
 
 export type PageRowDelimit = { min: number; max: number }
+export type PagePositionBodyRowCapacities = Record<
+  'first' | 'middle' | 'last',
+  number
+>
+
 export function delimitDataRowsByPage(
   userOptions: UserOptions,
   jsPDFConstructorOptions: jsPDFOptions,
-) {
+): {
+  pages: PageRowDelimit[]
+  capacities: PagePositionBodyRowCapacities
+} {
   const capacities = getPageBodyRowsCapacity(
     userOptions,
     jsPDFConstructorOptions,
@@ -147,15 +155,41 @@ export function delimitDataRowsByPage(
   const pages: PageRowDelimit[] = []
   const bodyLength = userOptions.body?.length ?? 0
 
+  const pagePositionCapacities: Partial<PagePositionBodyRowCapacities> = {}
+
+  const onePageCapacity = getCapacityFigureForPagePosition(
+    capacities,
+    userOptions,
+    'onePage',
+  )
+
   // Check if one page
-  if (
-    bodyLength <= getCapacityFigureForPage(capacities, userOptions, 'onePage')
-  ) {
+  if (bodyLength <= onePageCapacity) {
+    pagePositionCapacities['first'] = onePageCapacity
+    pagePositionCapacities['middle'] = onePageCapacity
+    pagePositionCapacities['last'] = onePageCapacity
+
     pages.push({
       min: 0,
       max: bodyLength - 1,
     })
   } else {
+    pagePositionCapacities['first'] = getCapacityFigureForPagePosition(
+      capacities,
+      userOptions,
+      'first',
+    )
+    pagePositionCapacities['middle'] = getCapacityFigureForPagePosition(
+      capacities,
+      userOptions,
+      'middle',
+    )
+    pagePositionCapacities['last'] = getCapacityFigureForPagePosition(
+      capacities,
+      userOptions,
+      'last',
+    )
+
     let traveler = 0
     while (traveler < bodyLength) {
       // Get page position
@@ -163,17 +197,12 @@ export function delimitDataRowsByPage(
 
       let position: PagePosition
       if (traveler === 0) position = 'first'
-      else if (
-        remainingRows <=
-        getCapacityFigureForPage(capacities, userOptions, 'last')
-      )
+      else if (remainingRows <= pagePositionCapacities['last']!)
         position = 'last'
       else position = 'middle'
 
-      const lastRowThisPage =
-        traveler +
-        getCapacityFigureForPage(capacities, userOptions, position) -
-        1
+      const capacity = pagePositionCapacities[position]!
+      const lastRowThisPage = traveler + capacity - 1
 
       pages.push({
         max: lastRowThisPage,
@@ -186,7 +215,7 @@ export function delimitDataRowsByPage(
 
   return {
     pages,
-    capacities,
+    capacities: pagePositionCapacities as PagePositionBodyRowCapacities,
   }
 }
 

@@ -145,21 +145,21 @@ export function normalizeCustomCellStyles(
   })
 }
 
-export interface PageBodyRowCapacities {
+export interface PageAppearanceBodyRowCapacities {
   bodyOnly: number
   head: number
   foot: number
   headFoot: number
 }
 
-export type PagePosition = 'first' | 'middle' | 'last' | 'onePage'
+export type PagePosition = 'first' | 'middle' | 'last'
 /**
  * Gets the number of body rows that can fit on a certain page based on its position (first, middle, last page)
  */
 export function getCapacityFigureForPage(
-  capacities: PageBodyRowCapacities,
+  capacities: PageAppearanceBodyRowCapacities,
   userOptions: UserOptions,
-  pagePosition: PagePosition,
+  pagePosition: PagePosition | 'onePage',
 ): number {
   // Adjust showHead and showFoot based on pagePosition
   const yesHead =

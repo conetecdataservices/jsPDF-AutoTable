@@ -14,10 +14,10 @@ import {
   doAutoTable,
   drawSinglePageContent,
   makeContentConverterHook,
+  PagePositionBodyRowCapacities,
   parseContentSection,
 } from './extensions/tableExtensions'
 import { jsPDFOptions } from 'jspdf'
-import { PageBodyRowCapacities } from './extensions/helpers'
 
 export type autoTable = (options: UserOptions) => void
 
@@ -43,7 +43,7 @@ export type DrawByPageMeta = {
    */
   pageDelimits: {
     pages: PageRowDelimit[]
-    capacities: PageBodyRowCapacities
+    capacities: PagePositionBodyRowCapacities
   }
   /**
    * Modify the row delimits for each page rendered

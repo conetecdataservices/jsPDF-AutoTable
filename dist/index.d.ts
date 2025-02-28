@@ -341,12 +341,7 @@ export type CellInput = null | string | string[] | number | boolean | CellDef;
 export type RowInput = {
 	[key: string]: CellInput;
 } | HtmlRowInput | CellInput[];
-export interface PageBodyRowCapacities {
-	bodyOnly: number;
-	head: number;
-	foot: number;
-	headFoot: number;
-}
+export type PagePositionBodyRowCapacities = Record<"first" | "middle" | "last", number>;
 export type autoTable = (options: UserOptions) => void;
 export declare function applyPlugin(jsPDF: jsPDFConstructor): void;
 declare function autoTable(d: jsPDFDocument, options: UserOptions): void;
@@ -365,7 +360,7 @@ export type DrawByPageMeta = {
 	 */
 	pageDelimits: {
 		pages: PageRowDelimit[];
-		capacities: PageBodyRowCapacities;
+		capacities: PagePositionBodyRowCapacities;
 	};
 	/**
 	 * Modify the row delimits for each page rendered

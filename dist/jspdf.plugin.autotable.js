@@ -1153,14 +1153,22 @@ function delimitDataRowsByPage(userOptions, jsPDFConstructorOptions) {
     var capacities = getPageBodyRowsCapacity(userOptions, jsPDFConstructorOptions);
     var pages = [];
     var bodyLength = (_b = (_a = userOptions.body) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
+    var pagePositionCapacities = {};
+    var onePageCapacity = (0, helpers_1.getCapacityFigureForPage)(capacities, userOptions, 'onePage');
     // Check if one page
-    if (bodyLength <= (0, helpers_1.getCapacityFigureForPage)(capacities, userOptions, 'onePage')) {
+    if (bodyLength <= onePageCapacity) {
+        pagePositionCapacities['first'] = onePageCapacity;
+        pagePositionCapacities['middle'] = onePageCapacity;
+        pagePositionCapacities['last'] = onePageCapacity;
         pages.push({
             min: 0,
             max: bodyLength - 1,
         });
     }
     else {
+        pagePositionCapacities['first'] = (0, helpers_1.getCapacityFigureForPage)(capacities, userOptions, 'first');
+        pagePositionCapacities['middle'] = (0, helpers_1.getCapacityFigureForPage)(capacities, userOptions, 'middle');
+        pagePositionCapacities['last'] = (0, helpers_1.getCapacityFigureForPage)(capacities, userOptions, 'last');
         var traveler = 0;
         while (traveler < bodyLength) {
             // Get page position
@@ -1168,14 +1176,12 @@ function delimitDataRowsByPage(userOptions, jsPDFConstructorOptions) {
             var position = void 0;
             if (traveler === 0)
                 position = 'first';
-            else if (remainingRows <=
-                (0, helpers_1.getCapacityFigureForPage)(capacities, userOptions, 'last'))
+            else if (remainingRows <= pagePositionCapacities['last'])
                 position = 'last';
             else
                 position = 'middle';
-            var lastRowThisPage = traveler +
-                (0, helpers_1.getCapacityFigureForPage)(capacities, userOptions, position) -
-                1;
+            var capacity = pagePositionCapacities[position];
+            var lastRowThisPage = traveler + capacity - 1;
             pages.push({
                 max: lastRowThisPage,
                 min: traveler,
@@ -1185,7 +1191,7 @@ function delimitDataRowsByPage(userOptions, jsPDFConstructorOptions) {
     }
     return {
         pages: pages,
-        capacities: capacities,
+        capacities: pagePositionCapacities,
     };
 }
 exports.delimitDataRowsByPage = delimitDataRowsByPage;
