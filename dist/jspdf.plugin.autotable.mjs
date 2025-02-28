@@ -2356,14 +2356,12 @@ function _applyPlugin (jsPDF) {
     };
 }
 
-// Custom table extensions for jsPDF-AutoTable, including support for text decorators and drawing by page
-// Also includes a new custom data format to make text decorators easier to use
-function doAutoTable(d, options) {
-    var input = parseInput(d, options);
-    var table = createTable(d, input);
-    drawTable(d, table);
-}
-function classifyInput(data) {
+/**
+ * Determines if the input format is the base JSPDF-autotable format, or the custom format created in this fork
+ * @param data
+ * @returns
+ */
+function classifyTableInput(data) {
     if (data.some(function (row) {
         if (Array.isArray(row)) {
             return row.some(function (cell) {
@@ -2384,7 +2382,7 @@ function classifyInput(data) {
 /**
  * Converts decorator syntax into the syntax used by the drawTable function
  */
-function parseBodyToCompat(format, data) {
+function parseTableInputToCompat(format, data) {
     if (format === 'normal') {
         return data;
     }
@@ -2464,11 +2462,44 @@ function normalizeCustomCellStyles(styledData) {
         });
     });
 }
+/**
+ * Gets the number of body rows that can fit on a certain page based on its position (first, middle, last page)
+ */
+function getCapacityFigureForPage(capacities, userOptions, pagePosition) {
+    // Adjust showHead and showFoot based on pagePosition
+    var yesHead = userOptions.showHead === 'everyPage' ||
+        (userOptions.showHead === 'firstPage' &&
+            (pagePosition === 'first' || pagePosition === 'onePage'));
+    var yesFoot = userOptions.showFoot === 'everyPage' ||
+        (userOptions.showFoot === 'lastPage' &&
+            (pagePosition === 'last' || pagePosition === 'onePage'));
+    if (yesHead && yesFoot) {
+        return capacities.headFoot;
+    }
+    // else
+    if (yesHead) {
+        return capacities.head;
+    }
+    // else
+    if (yesFoot) {
+        return capacities.foot;
+    }
+    // else
+    return capacities.bodyOnly;
+}
+
+// Custom table extensions for jsPDF-AutoTable, including support for text decorators and drawing by page
+// Also includes a new custom data format to make text decorators easier to use
+function doAutoTable(d, options) {
+    var input = parseInput(d, options);
+    var table = createTable(d, input);
+    drawTable(d, table);
+}
 function parseContentSection(section) {
     if (!section)
         return undefined;
-    var format = classifyInput(section);
-    var rowInput = parseBodyToCompat(format, section);
+    var format = classifyTableInput(section);
+    var rowInput = parseTableInputToCompat(format, section);
     if (format === 'custom') {
         return {
             compat: rowInput,
@@ -2483,46 +2514,107 @@ function parseContentSection(section) {
 }
 function makeContentConverterHook(contentSections) {
     return function (data) {
-        if (data.section === 'head' && (contentSections === null || contentSections === void 0 ? void 0 : contentSections.head)) {
+        var _a, _b, _c;
+        if (data.section === 'head' && ((_a = contentSections === null || contentSections === void 0 ? void 0 : contentSections.head) === null || _a === void 0 ? void 0 : _a.length)) {
             data.cell.text = contentSections.head[data.row.index][data.column.index];
         }
-        else if (data.section === 'body' && (contentSections === null || contentSections === void 0 ? void 0 : contentSections.body)) {
+        else if (data.section === 'body' && ((_b = contentSections === null || contentSections === void 0 ? void 0 : contentSections.body) === null || _b === void 0 ? void 0 : _b.length)) {
             data.cell.text = contentSections.body[data.row.index][data.column.index];
         }
-        else if (data.section === 'foot' && (contentSections === null || contentSections === void 0 ? void 0 : contentSections.foot)) {
+        else if (data.section === 'foot' && ((_c = contentSections === null || contentSections === void 0 ? void 0 : contentSections.foot) === null || _c === void 0 ? void 0 : _c.length)) {
             data.cell.text = contentSections.foot[data.row.index][data.column.index];
         }
     };
 }
-function delimitDataByPage(submitOptions) {
-    var tmpDoc = new jsPDF$1();
-    var firstLastElPerPage = [];
-    var currentBounds = { page: 0, min: 0, max: Infinity };
-    doAutoTable(tmpDoc, __assign(__assign({}, submitOptions), { didDrawCell: function (data) {
-            if (submitOptions.didDrawCell)
-                submitOptions.didDrawCell(data);
-            if (data.row.section !== 'body')
-                return;
-            if (currentBounds.page !== data.pageNumber) {
-                if (currentBounds.page !== 0) {
-                    firstLastElPerPage.push({
-                        min: currentBounds.min,
-                        max: currentBounds.max,
-                    });
-                }
-                currentBounds = {
-                    page: data.pageNumber,
-                    min: data.row.index,
-                    max: data.row.index,
-                };
-            }
+/**
+ * Determines how many rows of body content can fit on pages of the PDF, based on size and header/footer visibility
+ */
+function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
+    var appearanceModifiers = [
+        // None
+        [false, false],
+        // Head
+        [true, false],
+        // Foot
+        [false, true],
+        // Head Foot
+        [true, true],
+    ];
+    var maxRowsPerAppearance = appearanceModifiers.map(function (modifierSet) {
+        var tmpDoc = new jsPDF$1(jsPDFOptions);
+        var maxRows = 0;
+        var _loop_1 = function () {
+            var madeItToPage2 = false;
+            doAutoTable(tmpDoc, __assign(__assign({}, userOptions), { showHead: modifierSet[0], showFoot: modifierSet[1], didDrawCell: function (data) {
+                    if (userOptions.didDrawCell)
+                        userOptions.didDrawCell(data);
+                    if (data.row.section !== 'body')
+                        return;
+                    if (data.pageNumber > 1)
+                        madeItToPage2 = true;
+                    if (data.pageNumber === 1 && data.row.index > maxRows) {
+                        maxRows = data.row.index;
+                    }
+                } }));
+            if (!madeItToPage2) ;
             else {
-                if (data.row.index > currentBounds.max)
-                    currentBounds.max = data.row.index;
+                return "break";
             }
-        } }));
-    firstLastElPerPage.push({ min: currentBounds.min, max: currentBounds.max });
-    return firstLastElPerPage;
+        };
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            var state_1 = _loop_1();
+            if (state_1 === "break")
+                break;
+        }
+        return maxRows;
+    });
+    return {
+        bodyOnly: maxRowsPerAppearance[0],
+        head: maxRowsPerAppearance[1],
+        foot: maxRowsPerAppearance[2],
+        headFoot: maxRowsPerAppearance[3],
+    };
+}
+function delimitDataRowsByPage(userOptions, jsPDFConstructorOptions) {
+    var _a, _b;
+    var capacities = getPageBodyRowsCapacity(userOptions, jsPDFConstructorOptions);
+    var pages = [];
+    var bodyLength = (_b = (_a = userOptions.body) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
+    // Check if one page
+    if (bodyLength <= getCapacityFigureForPage(capacities, userOptions, 'onePage')) {
+        pages.push({
+            min: 0,
+            max: bodyLength - 1,
+        });
+    }
+    else {
+        var traveler = 0;
+        while (traveler < bodyLength) {
+            // Get page position
+            var remainingRows = bodyLength - traveler;
+            var position = void 0;
+            if (traveler === 0)
+                position = 'first';
+            else if (remainingRows <=
+                getCapacityFigureForPage(capacities, userOptions, 'last'))
+                position = 'last';
+            else
+                position = 'middle';
+            var lastRowThisPage = traveler +
+                getCapacityFigureForPage(capacities, userOptions, position) -
+                1;
+            pages.push({
+                max: lastRowThisPage,
+                min: traveler,
+            });
+            traveler = lastRowThisPage + 1;
+        }
+    }
+    return {
+        pages: pages,
+        capacities: capacities,
+    };
 }
 function drawSinglePageContent(d, options, contentSections, bounds, pageNumber, totalPages) {
     var _a, _b, _c, _d;
@@ -2586,7 +2678,7 @@ function applyPlugin(jsPDF) {
 function autoTable(d, options) {
     doAutoTable(d, options);
 }
-function autoTableWithTextDecorators(documentOrDrawByPage, options) {
+function autoTableWithTextDecorators(documentOrDrawByPage, options, jsPDFConstructorOptions) {
     var headContent = parseContentSection(options.head);
     var bodyContent = parseContentSection(options.body);
     var footContent = parseContentSection(options.foot);
@@ -2603,14 +2695,14 @@ function autoTableWithTextDecorators(documentOrDrawByPage, options) {
         return autoTable(documentOrDrawByPage, submitOptions);
     }
     // Draw by page
-    var pageDelimits = delimitDataByPage(submitOptions);
-    var iterator = pageDelimits.entries();
+    var pageDelimits = delimitDataRowsByPage(submitOptions, jsPDFConstructorOptions);
+    var iterator = pageDelimits.pages.entries();
     return {
         pageDelimits: pageDelimits,
         modifyDelimits: function (newBounds) {
             // TODO, future validation?
-            pageDelimits = newBounds;
-            iterator = pageDelimits.entries();
+            pageDelimits.pages = newBounds;
+            iterator = pageDelimits.pages.entries();
         },
         drawNextPage: function (document) {
             var pageBounds = iterator.next();
@@ -2619,7 +2711,7 @@ function autoTableWithTextDecorators(documentOrDrawByPage, options) {
                     body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.customStyles,
                     head: headContent === null || headContent === void 0 ? void 0 : headContent.customStyles,
                     foot: footContent === null || footContent === void 0 ? void 0 : footContent.customStyles,
-                }, pageBounds.value[1], pageBounds.value[0], pageDelimits.length);
+                }, pageBounds.value[1], pageBounds.value[0], pageDelimits.pages.length);
             }
             return !pageBounds.done;
         },

@@ -10,12 +10,14 @@ import { Table } from './models'
 import { CellHookData } from './HookData'
 import { Cell, Column, Row } from './models'
 import {
-  delimitDataByPage,
+  delimitDataRowsByPage,
   doAutoTable,
   drawSinglePageContent,
   makeContentConverterHook,
   parseContentSection,
-} from './tableExtensions'
+} from './extensions/tableExtensions'
+import { jsPDFOptions } from 'jspdf'
+import { PageBodyRowCapacities } from './extensions/helpers'
 
 export type autoTable = (options: UserOptions) => void
 
@@ -39,7 +41,10 @@ export type DrawByPageMeta = {
   /**
    * Indicates the row delimits for each page rendered (inclusive-inclusive)
    */
-  pageDelimits: PageRowDelimit[]
+  pageDelimits: {
+    pages: PageRowDelimit[]
+    capacities: PageBodyRowCapacities
+  }
   /**
    * Modify the row delimits for each page rendered
    */
@@ -65,10 +70,12 @@ function autoTableWithTextDecorators(
    */
   drawByPage: true,
   options: TextDecoratorUserOptions,
+  jsPDFConstructorOptions: jsPDFOptions,
 ): DrawByPageMeta
 function autoTableWithTextDecorators(
   documentOrDrawByPage: jsPDFDocument | true,
   options: TextDecoratorUserOptions,
+  jsPDFConstructorOptions?: jsPDFOptions,
 ): void | DrawByPageMeta {
   const headContent = parseContentSection(options.head)
   const bodyContent = parseContentSection(options.body)
@@ -95,15 +102,18 @@ function autoTableWithTextDecorators(
   }
 
   // Draw by page
-  let pageDelimits = delimitDataByPage(submitOptions)
-  let iterator = pageDelimits.entries()
+  const pageDelimits = delimitDataRowsByPage(
+    submitOptions,
+    jsPDFConstructorOptions!,
+  )
+  let iterator = pageDelimits.pages.entries()
 
   return {
     pageDelimits,
     modifyDelimits: (newBounds: PageRowDelimit[]) => {
       // TODO, future validation?
-      pageDelimits = newBounds
-      iterator = pageDelimits.entries()
+      pageDelimits.pages = newBounds
+      iterator = pageDelimits.pages.entries()
     },
     drawNextPage: (document) => {
       const pageBounds = iterator.next()
@@ -119,7 +129,7 @@ function autoTableWithTextDecorators(
           },
           pageBounds.value[1],
           pageBounds.value[0],
-          pageDelimits.length,
+          pageDelimits.pages.length,
         )
       }
 
