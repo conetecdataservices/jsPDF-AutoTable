@@ -101,10 +101,8 @@ export interface UserOptions {
 }
 
 export type CellTextPartInput = string | CustomCellStyle
-export type CustomTableInputSyntax = (
-  | CellTextPartInput
-  | CellTextPartInput[]
-)[][]
+export type CustomRowInputSyntax = (CellTextPartInput | CellTextPartInput[])[]
+export type CustomTableInputSyntax = CustomRowInputSyntax[]
 export type TextDecoratorUserOptions = Omit<
   UserOptions,
   'html' | 'head' | 'body' | 'foot'
