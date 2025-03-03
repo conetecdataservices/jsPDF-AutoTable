@@ -2540,12 +2540,13 @@ function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
         // Head Foot
         [true, true],
     ];
+    var body = [];
     var maxRowsPerAppearance = appearanceModifiers.map(function (modifierSet) {
         var tmpDoc = new jsPDF$1(jsPDFOptions);
         var maxRows = 0;
-        var _loop_1 = function () {
-            var madeItToPage2 = false;
-            doAutoTable(tmpDoc, __assign(__assign({}, userOptions), { showHead: modifierSet[0], showFoot: modifierSet[1], didDrawCell: function (data) {
+        var madeItToPage2 = false;
+        while (!madeItToPage2) {
+            doAutoTable(tmpDoc, __assign(__assign({}, userOptions), { body: body, showHead: modifierSet[0], showFoot: modifierSet[1], didDrawCell: function (data) {
                     if (userOptions.didDrawCell)
                         userOptions.didDrawCell(data);
                     if (data.row.section !== 'body')
@@ -2556,16 +2557,11 @@ function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
                         maxRows = data.row.index;
                     }
                 } }));
-            if (!madeItToPage2) ;
-            else {
-                return "break";
+            if (!madeItToPage2) {
+                for (var i = 0; i < 100; i++) {
+                    body.push([i]);
+                }
             }
-        };
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            var state_1 = _loop_1();
-            if (state_1 === "break")
-                break;
         }
         return maxRows;
     });

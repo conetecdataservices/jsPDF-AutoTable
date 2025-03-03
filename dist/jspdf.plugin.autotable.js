@@ -1111,9 +1111,9 @@ function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
     var maxRowsPerAppearance = appearanceModifiers.map(function (modifierSet) {
         var tmpDoc = new jspdf_1.default(jsPDFOptions);
         var maxRows = 0;
-        var _loop_1 = function () {
-            var madeItToPage2 = false;
-            doAutoTable(tmpDoc, __assign(__assign({}, userOptions), { showHead: modifierSet[0], showFoot: modifierSet[1], didDrawCell: function (data) {
+        var madeItToPage2 = false;
+        while (!madeItToPage2) {
+            doAutoTable(tmpDoc, __assign(__assign({}, userOptions), { body: body, showHead: modifierSet[0], showFoot: modifierSet[1], didDrawCell: function (data) {
                     if (userOptions.didDrawCell)
                         userOptions.didDrawCell(data);
                     if (data.row.section !== 'body')
@@ -1129,15 +1129,6 @@ function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
                     body.push([i]);
                 }
             }
-            else {
-                return "break";
-            }
-        };
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            var state_1 = _loop_1();
-            if (state_1 === "break")
-                break;
         }
         return maxRows;
     });

@@ -87,17 +87,17 @@ function getPageBodyRowsCapacity(
     // Head Foot
     [true, true],
   ]
-  const body = []
+  const body: RowInput[] = []
 
   const maxRowsPerAppearance = appearanceModifiers.map((modifierSet) => {
     const tmpDoc = new jsPDF(jsPDFOptions)
 
     let maxRows = 0
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      let madeItToPage2 = false
+    let madeItToPage2 = false
+    while (!madeItToPage2) {
       doAutoTable(tmpDoc, {
         ...userOptions,
+        body,
         showHead: modifierSet[0],
         showFoot: modifierSet[1],
 
@@ -118,8 +118,6 @@ function getPageBodyRowsCapacity(
         for (let i = 0; i < 100; i++) {
           body.push([i])
         }
-      } else {
-        break
       }
     }
 
