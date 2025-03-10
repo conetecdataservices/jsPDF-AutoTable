@@ -2,72 +2,21 @@
 // Also includes a new custom data format to make text decorators easier to use
 
 import jsPDF, { jsPDFOptions } from 'jspdf'
-import { CustomTableInputSyntax, RowInput, UserOptions } from '../config'
-import { CellHook } from '../models'
+import { RowInput, UserOptions } from '../config'
 import { jsPDFDocument } from '../documentHandler'
 import { drawTable as _drawTable } from '../tableDrawer'
 import { createTable as _createTable } from '../tableCalculator'
 import { parseInput } from '../inputParser'
 import {
-  classifyTableInput,
-  CustomCellTextGrid,
   getCapacityFigureForPage as getCapacityFigureForPagePosition,
-  normalizeCustomCellStyles,
   PageAppearanceBodyRowCapacities,
   PagePosition,
-  parseTableInputToCompat,
 } from './helpers'
 
 export function doAutoTable(d: jsPDFDocument, options: UserOptions) {
   const input = parseInput(d, options)
   const table = _createTable(d, input)
   _drawTable(d, table)
-}
-
-type ParsedContentSection = {
-  compat: RowInput[]
-  customStyles?: CustomCellTextGrid
-}
-export function parseContentSection(
-  section?: RowInput[] | CustomTableInputSyntax,
-): ParsedContentSection | undefined {
-  if (!section) return undefined
-
-  const format = classifyTableInput(section)
-
-  const rowInput = parseTableInputToCompat(format, section)
-
-  if (format === 'custom') {
-    return {
-      compat: rowInput,
-      customStyles: normalizeCustomCellStyles(
-        section as CustomTableInputSyntax,
-      ),
-    }
-  } else {
-    return {
-      compat: rowInput,
-    }
-  }
-}
-
-type CustomStyleContentSections = {
-  head?: CustomCellTextGrid
-  body?: CustomCellTextGrid
-  foot?: CustomCellTextGrid
-}
-export function makeContentConverterHook(
-  contentSections?: CustomStyleContentSections,
-): CellHook {
-  return (data) => {
-    if (data.section === 'head' && contentSections?.head?.length) {
-      data.cell.text = contentSections.head[data.row.index][data.column.index]
-    } else if (data.section === 'body' && contentSections?.body?.length) {
-      data.cell.text = contentSections.body[data.row.index][data.column.index]
-    } else if (data.section === 'foot' && contentSections?.foot?.length) {
-      data.cell.text = contentSections.foot[data.row.index][data.column.index]
-    }
-  }
 }
 
 /**
@@ -220,7 +169,6 @@ export function delimitDataRowsByPage(
 export function drawSinglePageContent(
   d: jsPDFDocument,
   options: UserOptions,
-  contentSections: CustomStyleContentSections,
   bounds: { min: number; max: number },
   pageNumber: number,
   totalPages: number,
@@ -236,19 +184,6 @@ export function drawSinglePageContent(
   }
 
   const bodyContentToDraw = options.body?.slice(bounds.min, bounds.max + 1)
-
-  const bodyReplacementContent = contentSections.body?.slice(
-    bounds.min,
-    bounds.max + 1,
-  )
-  const headReplacementContent = contentSections.head?.slice(
-    bounds.min,
-    bounds.max + 1,
-  )
-  const footReplacementContent = contentSections.foot?.slice(
-    bounds.min,
-    bounds.max + 1,
-  )
 
   let showHead = false
   let showFoot = false
@@ -276,15 +211,5 @@ export function drawSinglePageContent(
     body: bodyContentToDraw,
     showHead,
     showFoot,
-
-    willDrawCell: (data) => {
-      if (options.willDrawCell) options.willDrawCell(data)
-
-      makeContentConverterHook({
-        head: headReplacementContent,
-        body: bodyReplacementContent,
-        foot: footReplacementContent,
-      })(data)
-    },
   })
 }

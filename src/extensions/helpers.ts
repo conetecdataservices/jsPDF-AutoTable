@@ -1,81 +1,38 @@
 import {
+  CellDef,
+  CellInput,
   CellTextPartInput,
-  CustomTableInputSyntax,
   RowInput,
   UserOptions,
 } from '../config'
 import { CustomCellText, CustomCellTextLine } from '../models'
 
-export type CustomCellTextGrid = CustomCellText[][] // Multi-row, multi-column
-
-type InputFormat = 'normal' | 'custom'
-export function classifyTableInput(data: CustomTableInputSyntax): 'custom'
-export function classifyTableInput(data: RowInput[]): 'normal'
-export function classifyTableInput(
-  data: RowInput[] | CustomTableInputSyntax,
-): InputFormat
-/**
- * Determines if the input format is the base JSPDF-autotable format, or the custom format created in this fork
- * @param data
- * @returns
- */
-export function classifyTableInput(
-  data: RowInput[] | CustomTableInputSyntax,
-): InputFormat {
-  if (
-    data.some((row) => {
-      if (Array.isArray(row)) {
-        return row.some((cell) => {
-          const normalized = Array.isArray(cell) ? cell : [cell]
-
-          return normalized.some((cellPart) => {
-            return (
-              cellPart !== null &&
-              typeof cellPart === 'object' &&
-              'text' in cellPart
-            )
-          })
-        })
-      }
-
-      return false
-    })
-  ) {
-    return 'custom'
-  }
-
-  return 'normal'
+export function cellIsCellDefType(cell: CellInput): cell is CellDef {
+  return typeof cell === 'object' && !Array.isArray(cell) && cell !== null
 }
 
 /**
- * Converts decorator syntax into the syntax used by the drawTable function
+ * Converts decorator syntax into the syntax used by the base drawTable function
  */
-export function parseTableInputToCompat<Format extends InputFormat>(
-  format: Format,
-  data: Format extends 'normal' ? RowInput[] : CustomTableInputSyntax,
-): RowInput[] {
-  if (format === 'normal') {
-    return data as RowInput[]
-  }
-
-  return (data as CustomTableInputSyntax).map((row) => {
-    return row.map((cell) => {
-      if (Array.isArray(cell)) {
-        return cell.map((cell) => {
-          return typeof cell === 'object' ? cell.text : cell
-        })
-      } else {
-        return typeof cell === 'object' ? cell.text : cell
-      }
-    })
+export function convertCustomCellContentToString(
+  data: CustomCellText,
+): string[] {
+  return data.map((line) => {
+    return line.map((part) => part.text).join()
   })
 }
 
 /**
  * Parses a part of text within a cell and converts into a custom cell object
+ *
+ * Edits in-place
  */
-function parsePart(part: CellTextPartInput): CustomCellTextLine {
+function parsePart(
+  part: CellTextPartInput | CustomCellTextLine,
+): CustomCellTextLine {
   const splitter = /(\r\n|\r|\n)/g
+
+  if (Array.isArray(part)) return part
 
   let parts: CustomCellTextLine
   if (typeof part === 'string') {
@@ -111,37 +68,48 @@ function parsePart(part: CellTextPartInput): CustomCellTextLine {
 }
 
 /**
- * Normalize (string | object) cells to just object type
- * @param styledData
- * @returns
+ * Interprets custom content syntax within the section input and processes it
+ *
+ * Edits in-place
  */
-export function normalizeCustomCellStyles(
-  styledData: CustomTableInputSyntax,
-): CustomCellTextGrid {
+export function preprocessContentSection(sectionInput?: RowInput[]): void {
+  if (!sectionInput) return
+
   // Multi-row, multi-column
-  return styledData.map((row) => {
-    return row.map((cell) => {
-      const lines: CustomCellText = []
+  sectionInput.forEach((row) => {
+    // Only touch the custom content property, ignore everything else
 
-      const cellNormalized = Array.isArray(cell) ? cell : [cell]
+    if (Array.isArray(row)) {
+      row.forEach((cell) => {
+        if (cellIsCellDefType(cell) && cell.customContentSyntax !== undefined) {
+          // CellDef type only
+          const customSyntax = cell.customContentSyntax
+          const lines: CustomCellText = []
 
-      let currentLine: CustomCellTextLine = []
-      cellNormalized.forEach((part) => {
-        // Returns line-breaks as separate parts
-        const processed = parsePart(part)
+          const cellNormalized = Array.isArray(customSyntax)
+            ? customSyntax
+            : [customSyntax]
 
-        processed.forEach((processedPart, i) => {
-          if (i !== 0) {
-            lines.push(currentLine)
-            currentLine = []
-          }
-          currentLine.push(processedPart)
-        })
+          let currentLine: CustomCellTextLine = []
+          cellNormalized?.forEach((part) => {
+            // Returns line-breaks as separate parts
+            const processed = parsePart(part)
+
+            processed.forEach((processedPart, i) => {
+              if (i !== 0) {
+                lines.push(currentLine)
+                currentLine = []
+              }
+              currentLine.push(processedPart)
+            })
+          })
+          lines.push(currentLine)
+
+          cell.customContentSyntax = lines
+          cell.content = convertCustomCellContentToString(lines)
+        }
       })
-      lines.push(currentLine)
-
-      return lines
-    })
+    }
   })
 }
 

@@ -2,7 +2,8 @@ import autoTableText from './autoTableText'
 import { addTableBorder, getFillStyle } from './common'
 import { LineWidths } from './config'
 import { DocHandler, jsPDFDocument } from './documentHandler'
-import { Cell, Column, Pos, Row, Table } from './models'
+import { cellIsCellDefType } from './extensions/helpers'
+import { Cell, Column, CustomCellText, Pos, Row, Table } from './models'
 import { assign } from './polyfills'
 import { calculateAllColumnsCanFitInPage } from './tablePrinter'
 
@@ -422,6 +423,10 @@ function printRow(
     if (result === false) {
       cursor.x += column.width
       continue
+    }
+
+    if (cellIsCellDefType(cell.raw)) {
+      cell.text = cell.raw.customContentSyntax as CustomCellText
     }
 
     drawCellRect(doc, cell, cursor)

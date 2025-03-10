@@ -1,4 +1,4 @@
-import { CellHook, CustomCellStyle, PageHook } from './models'
+import { CellHook, CustomCellStyle, CustomCellText, PageHook } from './models'
 
 export interface LineWidths {
   bottom: number
@@ -98,18 +98,6 @@ export interface UserOptions {
   didDrawPage?: PageHook
 }
 
-export type CellTextPartInput = string | CustomCellStyle
-export type CustomRowInputSyntax = (CellTextPartInput | CellTextPartInput[])[]
-export type CustomTableInputSyntax = CustomRowInputSyntax[]
-export type TextDecoratorUserOptions = Omit<
-  UserOptions,
-  'html' | 'head' | 'body' | 'foot'
-> & {
-  head?: RowInput[] | CustomTableInputSyntax
-  body?: RowInput[] | CustomTableInputSyntax
-  foot?: RowInput[] | CustomTableInputSyntax
-}
-
 export type ColumnInput =
   | string
   | number
@@ -128,11 +116,21 @@ export type MarginPaddingInput =
       vertical?: number
     }
 
+/**
+ * A part of text in a cell using the custom text syntax
+ */
+export type CellTextPartInput = string | CustomCellStyle
 export interface CellDef {
   rowSpan?: number
   colSpan?: number
   styles?: Partial<Styles>
   content?: string | string[] | number
+  /**
+   * Utilize an extended syntax of the content which allows for multiple "text parts" with different modifiers to be part of a cell
+   *
+   * If provided, will override the `content` property of this cell.
+   */
+  customContentSyntax?: CellTextPartInput | CellTextPartInput[] | CustomCellText
   _element?: HTMLTableCellElement
 }
 
@@ -146,7 +144,10 @@ export class HtmlRowInput extends Array<CellDef> {
 }
 
 export type CellInput = null | string | string[] | number | boolean | CellDef
-export type RowInput = { [key: string]: CellInput } | HtmlRowInput | CellInput[]
+
+// Disable these input types because we don't use them and they might cause bugs
+export type RowInput =
+  /* { [key: string]: CellInput } | HtmlRowInput | */ CellInput[]
 
 // Base style for all themes
 export function defaultStyles(scaleFactor: number): Styles {
