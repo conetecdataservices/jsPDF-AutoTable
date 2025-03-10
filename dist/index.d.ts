@@ -255,14 +255,6 @@ export interface UserOptions {
 	/** Called after the plugin has finished drawing everything on a page. Can be used to add footers with page numbers or any other content that you want on each page there is an autotable. */
 	didDrawPage?: PageHook;
 }
-export type CellTextPartInput = string | CustomCellStyle;
-export type CustomRowInputSyntax = (CellTextPartInput | CellTextPartInput[])[];
-export type CustomTableInputSyntax = CustomRowInputSyntax[];
-export type TextDecoratorUserOptions = Omit<UserOptions, "html" | "head" | "body" | "foot"> & {
-	head?: RowInput[] | CustomTableInputSyntax;
-	body?: RowInput[] | CustomTableInputSyntax;
-	foot?: RowInput[] | CustomTableInputSyntax;
-};
 export type ColumnInput = string | number | {
 	header?: CellInput;
 	footer?: CellInput;
@@ -281,11 +273,21 @@ export type MarginPaddingInput = number | number[] | {
 	horizontal?: number;
 	vertical?: number;
 };
+/**
+ * A part of text in a cell using the custom text syntax
+ */
+export type CellTextPartInput = string | CustomCellStyle;
 export interface CellDef {
 	rowSpan?: number;
 	colSpan?: number;
 	styles?: Partial<Styles>;
 	content?: string | string[] | number;
+	/**
+	 * Utilize an extended syntax of the content which allows for multiple "text parts" with different modifiers to be part of a cell
+	 *
+	 * If provided, will override the `content` property of this cell.
+	 */
+	customContentSyntax?: CellTextPartInput | CellTextPartInput[] | CustomCellText;
 	_element?: HTMLTableCellElement;
 }
 declare class HtmlRowInput extends Array<CellDef> {
@@ -340,7 +342,18 @@ declare class DocHandler {
 export declare function applyPlugin(jsPDF: jsPDFConstructor): void;
 export type PagePositionBodyRowCapacities = Record<"first" | "middle" | "last", number>;
 export type autoTableInstanceType = (options: UserOptions) => void;
-export declare function autoTable(d: jsPDFDocument, options: UserOptions): void;
+export interface AutoTableBaseParams {
+	options: UserOptions;
+}
+export interface AutoTableStandardParams extends AutoTableBaseParams {
+	drawByPage?: false;
+	doc: jsPDFDocument;
+}
+export interface AutoTableDrawByPageParams extends AutoTableBaseParams {
+	/** Whether or not to draw the table one page at a time via a return page iterator function */
+	drawByPage: true;
+	jsPDFConstructorArgs: jsPDFOptions;
+}
 export type PageRowDelimit = {
 	min: number;
 	max: number;
@@ -363,22 +376,8 @@ export type DrawByPageMeta = {
 	 */
 	modifyDelimits: (newBounds: PageRowDelimit[]) => void;
 };
-/**
- * run autoTable with a custom syntax that supports certain
- * text decoration, such as: bold, italics, and super/subscripts
- *
- * Optionally supports drawing by page
- */
-export declare function autoTableWithTextDecorators(
-/**
- * Set to true to enable draw-by-page mode
- */
-d: jsPDFDocument, options: TextDecoratorUserOptions): void;
-export declare function autoTableWithTextDecorators(
-/**
- * Pass a JsPDF instance to draw the table to the document and disable draw-by-page mode
- */
-drawByPage: true, options: TextDecoratorUserOptions, jsPDFConstructorOptions: jsPDFOptions): DrawByPageMeta;
+export declare function autoTable(args: AutoTableStandardParams): void;
+export declare function autoTable(args: AutoTableDrawByPageParams): DrawByPageMeta;
 export declare function __createTable(d: jsPDFDocument, options: UserOptions): Table;
 export declare function __drawTable(d: jsPDFDocument, table: Table): void;
 

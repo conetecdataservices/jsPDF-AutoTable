@@ -145,9 +145,7 @@ export class HtmlRowInput extends Array<CellDef> {
 
 export type CellInput = null | string | string[] | number | boolean | CellDef
 
-// Disable these input types because we don't use them and they might cause bugs
-export type RowInput =
-  /* { [key: string]: CellInput } | HtmlRowInput | */ CellInput[]
+export type RowInput = { [key: string]: CellInput } | HtmlRowInput | CellInput[]
 
 // Base style for all themes
 export function defaultStyles(scaleFactor: number): Styles {
