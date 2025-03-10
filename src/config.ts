@@ -1,4 +1,4 @@
-import { CellHook, PageHook } from './models'
+import { CellHook, CustomCellStyle, PageHook } from './models'
 
 export interface LineWidths {
   bottom: number
@@ -29,6 +29,13 @@ export interface Styles {
   textColor: Color
   halign: HAlignType
   valign: VAlignType
+  /**
+   * When applicable (ie using custom table syntax and halign is center
+   * Choose to include or omit script symbols
+   *
+   * (script width must be included for right-align and unnecessary for left-align)
+   */
+  ignoreScriptsInWidthCalc: boolean
   fontSize: number
   cellPadding: MarginPaddingInput
   lineColor: Color
@@ -91,6 +98,18 @@ export interface UserOptions {
   didDrawPage?: PageHook
 }
 
+export type CellTextPartInput = string | CustomCellStyle
+export type CustomRowInputSyntax = (CellTextPartInput | CellTextPartInput[])[]
+export type CustomTableInputSyntax = CustomRowInputSyntax[]
+export type TextDecoratorUserOptions = Omit<
+  UserOptions,
+  'html' | 'head' | 'body' | 'foot'
+> & {
+  head?: RowInput[] | CustomTableInputSyntax
+  body?: RowInput[] | CustomTableInputSyntax
+  foot?: RowInput[] | CustomTableInputSyntax
+}
+
 export type ColumnInput =
   | string
   | number
@@ -139,6 +158,7 @@ export function defaultStyles(scaleFactor: number): Styles {
     textColor: 20,
     halign: 'left', // left, center, right, justify
     valign: 'top', // top, middle, bottom
+    ignoreScriptsInWidthCalc: false,
     fontSize: 10,
     cellPadding: 5 / scaleFactor, // number or {top,left,right,left,vertical,horizontal}
     lineColor: 200,

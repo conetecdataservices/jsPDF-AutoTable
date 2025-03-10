@@ -219,11 +219,20 @@ export class Row {
   }
 }
 
+export interface CustomCellStyle {
+  text: string
+  effect?: 'bold' | 'italic' | 'bolditalic'
+  script?: 'super' | 'sub'
+}
+
+export type CustomCellTextLine = CustomCellStyle[] // Single-style, single-line
+export type CustomCellText = CustomCellTextLine[] // Multi-style, multi-line
+
 export type Section = 'head' | 'body' | 'foot'
 export class Cell {
   raw: HTMLTableCellElement | CellInput
   styles: Styles
-  text: string[]
+  text: string[] | CustomCellText // Multi-line text
   section: Section
   colSpan: number
   rowSpan: number

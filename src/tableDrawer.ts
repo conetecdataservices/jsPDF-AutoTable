@@ -434,6 +434,7 @@ function printRow(
       {
         halign: cell.styles.halign,
         valign: cell.styles.valign,
+        ignoreScriptsInWidthCalc: cell.styles.ignoreScriptsInWidthCalc,
         maxWidth: Math.ceil(
           cell.width - cell.padding('left') - cell.padding('right'),
         ),

@@ -1,3 +1,161 @@
+import jsPDF$1 from 'jspdf';
+
+/******************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
+
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
+};
+
+function __extends(d, b) {
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+}
+
+var __assign = function() {
+    __assign = Object.assign || function __assign(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
+
+typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+};
+
+function applyCustomCellStyling(doc, style, position) {
+    // Store current font
+    var currentFont = doc.getFont();
+    if (style.effect) {
+        switch (style.effect) {
+            case 'bold':
+                doc.setFont(currentFont.fontName, 'bold');
+                break;
+            case 'italic':
+                doc.setFont(currentFont.fontName, 'italic');
+                break;
+            case 'bolditalic':
+                doc.setFont(currentFont.fontName, 'bolditalic');
+                break;
+        }
+    }
+    // Get current font size
+    var currentFontSize = doc.getFontSize();
+    var currentY = position.y;
+    if (style.script) {
+        var scriptOffset = currentFontSize / 6;
+        var sizeOffset = currentFontSize / 3;
+        doc.setFontSize(currentFontSize - sizeOffset);
+        switch (style.script) {
+            case 'super':
+                position.y -= scriptOffset;
+                break;
+            case 'sub':
+                position.y += scriptOffset / 3;
+                break;
+        }
+    }
+    // Reverter
+    return function () {
+        if (style.effect) {
+            doc.setFont(currentFont.fontName, currentFont.fontStyle);
+        }
+        if (style.script) {
+            doc.setFontSize(currentFontSize);
+            position.y = currentY;
+        }
+    };
+}
+function iterateCellText(doc, cellText, positioning, cb) {
+    if (typeof cellText === 'string') {
+        cb(cellText, positioning);
+    }
+    else if (Array.isArray(cellText) &&
+        cellText.every(function (part) { return typeof part === 'string'; })) {
+        cellText.forEach(function (part, i) {
+            var newPosition = {
+                x: positioning.x,
+                y: positioning.y + positioning.lineHeight * i,
+                lineHeight: positioning.lineHeight,
+            };
+            cb(part, newPosition);
+        });
+    }
+    else {
+        if (Array.isArray(cellText[0])) {
+            cellText.forEach(function (line, i) {
+                var newPosition = {
+                    x: positioning.x,
+                    y: positioning.y + positioning.lineHeight * i,
+                    lineHeight: positioning.lineHeight,
+                };
+                iterateCellText(doc, line, newPosition, cb);
+            });
+        }
+        else {
+            cellText.forEach(function (part) {
+                var reverter = applyCustomCellStyling(doc, part, positioning);
+                cb(part, positioning);
+                positioning.x += doc.getTextWidth(part.text);
+                reverter();
+            });
+        }
+    }
+}
+function doThePrint(doc, text, x, y, lineHeight, options) {
+    iterateCellText(doc, text, { x: x, y: y, lineHeight: lineHeight }, function (part, positioning) {
+        if (typeof part === 'string') {
+            doc.text(part, positioning.x, positioning.y, options);
+        }
+        else {
+            doc.text(part.text, positioning.x, positioning.y, options);
+        }
+    });
+}
+function getCellLineUnitWidth(doc, text, x, y, lineHeight, ignoreScripts) {
+    if (typeof text === 'string') {
+        return doc.getStringUnitWidth(text);
+    }
+    else {
+        var acc_1 = 0;
+        iterateCellText(doc, text, { x: x, y: y, lineHeight: lineHeight }, function (part) {
+            if (typeof part === 'string') {
+                acc_1 += doc.getStringUnitWidth(part);
+            }
+            else {
+                if (ignoreScripts && part.script !== undefined) {
+                    return;
+                }
+                acc_1 += doc.getStringUnitWidth(part.text);
+            }
+        });
+        return acc_1;
+    }
+}
 /**
  * Improved text function with halign and valign support
  * Inspiration from: http://stackoverflow.com/questions/28327510/align-text-right-using-jspdf/28433113#28433113
@@ -33,18 +191,25 @@ function autoTableText (text, x, y, styles, doc) {
             alignSize *= 0.5;
         if (splitText && lineCount >= 1) {
             for (var iLine = 0; iLine < splitText.length; iLine++) {
-                doc.text(splitText[iLine], x - doc.getStringUnitWidth(splitText[iLine]) * alignSize, y);
+                var textContent = splitText[iLine];
+                doThePrint(doc, textContent, x -
+                    getCellLineUnitWidth(doc, textContent, x, y, lineHeight, styles.ignoreScriptsInWidthCalc && styles.halign === 'center') *
+                        alignSize, y, lineHeight);
                 y += lineHeight;
             }
             return doc;
         }
-        x -= doc.getStringUnitWidth(text) * alignSize;
+        x -=
+            getCellLineUnitWidth(doc, text, x, y, lineHeight, styles.ignoreScriptsInWidthCalc && styles.halign === 'center') * alignSize;
     }
     if (styles.halign === 'justify') {
-        doc.text(text, x, y, { maxWidth: styles.maxWidth || 100, align: 'justify' });
+        doThePrint(doc, text, x, y, lineHeight, {
+            maxWidth: styles.maxWidth || 100,
+            align: 'justify',
+        });
     }
     else {
-        doc.text(text, x, y);
+        doThePrint(doc, text, x, y, lineHeight);
     }
     return doc;
 }
@@ -207,42 +372,6 @@ var DocHandler = /** @class */ (function () {
     return DocHandler;
 }());
 
-/******************************************************************************
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
-/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
-
-var extendStatics = function(d, b) {
-    extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
-    return extendStatics(d, b);
-};
-
-function __extends(d, b) {
-    if (typeof b !== "function" && b !== null)
-        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
-    extendStatics(d, b);
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-}
-
-typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
-    var e = new Error(message);
-    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
-};
-
 var HtmlRowInput = /** @class */ (function (_super) {
     __extends(HtmlRowInput, _super);
     function HtmlRowInput(element) {
@@ -262,6 +391,7 @@ function defaultStyles(scaleFactor) {
         textColor: 20,
         halign: 'left', // left, center, right, justify
         valign: 'top', // top, middle, bottom
+        ignoreScriptsInWidthCalc: false,
         fontSize: 10,
         cellPadding: 5 / scaleFactor, // number or {top,left,right,left,vertical,horizontal}
         lineColor: 200,
@@ -1134,7 +1264,8 @@ function calculate(doc, table) {
             var hooks = table.hooks.didParseCell;
             table.callCellHooks(doc, hooks, cell, row, column, null);
             var padding = cell.padding('horizontal');
-            cell.contentWidth = getStringWidth(cell.text, cell.styles, doc) + padding;
+            cell.contentWidth =
+                getStringWidth(cell.text, cell.styles, doc) + padding;
             // Using [^\S\u00A0] instead of \s ensures that we split the text on all
             // whitespace except non-breaking spaces (\u00A0). We need to preserve
             // them in the split process to ensure correct word separation and width
@@ -1872,6 +2003,7 @@ function printRow(doc, table, row, cursor, columns) {
         autoTableText(cell.text, textPos.x, textPos.y, {
             halign: cell.styles.halign,
             valign: cell.styles.valign,
+            ignoreScriptsInWidthCalc: cell.styles.ignoreScriptsInWidthCalc,
             maxWidth: Math.ceil(cell.width - cell.padding('left') - cell.padding('right')),
         }, doc.getDocument());
         table.callCellHooks(doc, table.hooks.didDrawCell, cell, row, column, cursor);
@@ -2050,11 +2182,366 @@ function applyPlugin(jsPDF) {
     };
 }
 
+/**
+ * Determines if the input format is the base JSPDF-autotable format, or the custom format created in this fork
+ * @param data
+ * @returns
+ */
+function classifyTableInput(data) {
+    if (data.some(function (row) {
+        if (Array.isArray(row)) {
+            return row.some(function (cell) {
+                var normalized = Array.isArray(cell) ? cell : [cell];
+                return normalized.some(function (cellPart) {
+                    return (cellPart !== null &&
+                        typeof cellPart === 'object' &&
+                        'text' in cellPart);
+                });
+            });
+        }
+        return false;
+    })) {
+        return 'custom';
+    }
+    return 'normal';
+}
+/**
+ * Converts decorator syntax into the syntax used by the drawTable function
+ */
+function parseTableInputToCompat(format, data) {
+    if (format === 'normal') {
+        return data;
+    }
+    return data.map(function (row) {
+        return row.map(function (cell) {
+            if (Array.isArray(cell)) {
+                return cell.map(function (cell) {
+                    return typeof cell === 'object' ? cell.text : cell;
+                });
+            }
+            else {
+                return typeof cell === 'object' ? cell.text : cell;
+            }
+        });
+    });
+}
+/**
+ * Parses a part of text within a cell and converts into a custom cell object
+ */
+function parsePart(part) {
+    var splitter = /(\r\n|\r|\n)/g;
+    var parts;
+    if (typeof part === 'string') {
+        parts = part.split(splitter).map(function (line) { return ({ text: line }); });
+    }
+    else {
+        parts = part.text.split(splitter).map(function (line) { return ({
+            text: line,
+            effect: part.effect,
+            script: part.script,
+        }); });
+    }
+    // Remove newline entries
+    // Keep newlines up to the first proper text content so that text like "\n\ntest" works as expected
+    var filtered = [];
+    var realContentFound = false;
+    parts
+        .filter(function (p) { return p.text !== ''; })
+        .forEach(function (p) {
+        var pFilt = p.text.replace(splitter, '');
+        if (pFilt.length === 0) {
+            if (!realContentFound)
+                filtered.push({ text: pFilt });
+        }
+        else {
+            realContentFound = true; //
+            filtered.push(__assign(__assign({}, p), { text: pFilt }));
+        }
+    });
+    return filtered;
+}
+/**
+ * Normalize (string | object) cells to just object type
+ * @param styledData
+ * @returns
+ */
+function normalizeCustomCellStyles(styledData) {
+    // Multi-row, multi-column
+    return styledData.map(function (row) {
+        return row.map(function (cell) {
+            var lines = [];
+            var cellNormalized = Array.isArray(cell) ? cell : [cell];
+            var currentLine = [];
+            cellNormalized.forEach(function (part) {
+                // Returns line-breaks as separate parts
+                var processed = parsePart(part);
+                processed.forEach(function (processedPart, i) {
+                    if (i !== 0) {
+                        lines.push(currentLine);
+                        currentLine = [];
+                    }
+                    currentLine.push(processedPart);
+                });
+            });
+            lines.push(currentLine);
+            return lines;
+        });
+    });
+}
+/**
+ * Gets the number of body rows that can fit on a certain page based on its position (first, middle, last page)
+ */
+function getCapacityFigureForPage(capacities, userOptions, pagePosition) {
+    // Adjust showHead and showFoot based on pagePosition
+    var yesHead = userOptions.showHead === 'everyPage' ||
+        (userOptions.showHead === 'firstPage' &&
+            (pagePosition === 'first' || pagePosition === 'onePage'));
+    var yesFoot = userOptions.showFoot === 'everyPage' ||
+        (userOptions.showFoot === 'lastPage' &&
+            (pagePosition === 'last' || pagePosition === 'onePage'));
+    if (yesHead && yesFoot) {
+        return capacities.headFoot;
+    }
+    // else
+    if (yesHead) {
+        return capacities.head;
+    }
+    // else
+    if (yesFoot) {
+        return capacities.foot;
+    }
+    // else
+    return capacities.bodyOnly;
+}
+
+// Custom table extensions for jsPDF-AutoTable, including support for text decorators and drawing by page
+// Also includes a new custom data format to make text decorators easier to use
+function doAutoTable(d, options) {
+    var input = parseInput(d, options);
+    var table = createTable(d, input);
+    drawTable(d, table);
+}
+function parseContentSection(section) {
+    if (!section)
+        return undefined;
+    var format = classifyTableInput(section);
+    var rowInput = parseTableInputToCompat(format, section);
+    if (format === 'custom') {
+        return {
+            compat: rowInput,
+            customStyles: normalizeCustomCellStyles(section),
+        };
+    }
+    else {
+        return {
+            compat: rowInput,
+        };
+    }
+}
+function makeContentConverterHook(contentSections) {
+    return function (data) {
+        var _a, _b, _c;
+        if (data.section === 'head' && ((_a = contentSections === null || contentSections === void 0 ? void 0 : contentSections.head) === null || _a === void 0 ? void 0 : _a.length)) {
+            data.cell.text = contentSections.head[data.row.index][data.column.index];
+        }
+        else if (data.section === 'body' && ((_b = contentSections === null || contentSections === void 0 ? void 0 : contentSections.body) === null || _b === void 0 ? void 0 : _b.length)) {
+            data.cell.text = contentSections.body[data.row.index][data.column.index];
+        }
+        else if (data.section === 'foot' && ((_c = contentSections === null || contentSections === void 0 ? void 0 : contentSections.foot) === null || _c === void 0 ? void 0 : _c.length)) {
+            data.cell.text = contentSections.foot[data.row.index][data.column.index];
+        }
+    };
+}
+/**
+ * Determines how many rows of body content can fit on pages of the PDF, based on size and header/footer visibility
+ */
+function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
+    var appearanceModifiers = [
+        // None
+        [false, false],
+        // Head
+        [true, false],
+        // Foot
+        [false, true],
+        // Head Foot
+        [true, true],
+    ];
+    var body = [];
+    var maxRowsPerAppearance = appearanceModifiers.map(function (modifierSet) {
+        var tmpDoc = new jsPDF$1(jsPDFOptions);
+        var maxRows = 0;
+        var madeItToPage2 = false;
+        while (!madeItToPage2) {
+            doAutoTable(tmpDoc, __assign(__assign({}, userOptions), { body: body, showHead: modifierSet[0], showFoot: modifierSet[1], didDrawCell: function (data) {
+                    if (userOptions.didDrawCell)
+                        userOptions.didDrawCell(data);
+                    if (data.row.section !== 'body')
+                        return;
+                    if (data.pageNumber > 1)
+                        madeItToPage2 = true;
+                    if (data.pageNumber === 1 && data.row.index > maxRows) {
+                        maxRows = data.row.index;
+                    }
+                } }));
+            if (!madeItToPage2) {
+                for (var i = 0; i < 100; i++) {
+                    body.push([i]);
+                }
+            }
+        }
+        return maxRows;
+    });
+    return {
+        bodyOnly: maxRowsPerAppearance[0],
+        head: maxRowsPerAppearance[1],
+        foot: maxRowsPerAppearance[2],
+        headFoot: maxRowsPerAppearance[3],
+    };
+}
+function delimitDataRowsByPage(userOptions, jsPDFConstructorOptions) {
+    var _a, _b;
+    var capacities = getPageBodyRowsCapacity(userOptions, jsPDFConstructorOptions);
+    var pages = [];
+    var bodyLength = (_b = (_a = userOptions.body) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
+    var pagePositionCapacities = {};
+    var onePageCapacity = getCapacityFigureForPage(capacities, userOptions, 'onePage');
+    // Check if one page
+    if (bodyLength <= onePageCapacity) {
+        pagePositionCapacities['first'] = onePageCapacity;
+        pagePositionCapacities['middle'] = onePageCapacity;
+        pagePositionCapacities['last'] = onePageCapacity;
+        pages.push({
+            min: 0,
+            max: bodyLength - 1,
+        });
+    }
+    else {
+        pagePositionCapacities['first'] = getCapacityFigureForPage(capacities, userOptions, 'first');
+        pagePositionCapacities['middle'] = getCapacityFigureForPage(capacities, userOptions, 'middle');
+        pagePositionCapacities['last'] = getCapacityFigureForPage(capacities, userOptions, 'last');
+        var traveler = 0;
+        while (traveler < bodyLength) {
+            // Get page position
+            var remainingRows = bodyLength - traveler;
+            var position = void 0;
+            if (traveler === 0)
+                position = 'first';
+            else if (remainingRows <= pagePositionCapacities['last'])
+                position = 'last';
+            else
+                position = 'middle';
+            var capacity = pagePositionCapacities[position];
+            var lastRowThisPage = traveler + capacity - 1;
+            pages.push({
+                max: lastRowThisPage,
+                min: traveler,
+            });
+            traveler = lastRowThisPage + 1;
+        }
+    }
+    return {
+        pages: pages,
+        capacities: pagePositionCapacities,
+    };
+}
+function drawSinglePageContent(d, options, contentSections, bounds, pageNumber, totalPages) {
+    var _a, _b, _c, _d;
+    // Get page position
+    var pagePosition;
+    if (pageNumber === 0) {
+        pagePosition = 'start';
+    }
+    else if (pageNumber === totalPages - 1) {
+        pagePosition = 'end';
+    }
+    else {
+        pagePosition = 'middle';
+    }
+    var bodyContentToDraw = (_a = options.body) === null || _a === void 0 ? void 0 : _a.slice(bounds.min, bounds.max + 1);
+    var bodyReplacementContent = (_b = contentSections.body) === null || _b === void 0 ? void 0 : _b.slice(bounds.min, bounds.max + 1);
+    var headReplacementContent = (_c = contentSections.head) === null || _c === void 0 ? void 0 : _c.slice(bounds.min, bounds.max + 1);
+    var footReplacementContent = (_d = contentSections.foot) === null || _d === void 0 ? void 0 : _d.slice(bounds.min, bounds.max + 1);
+    var showHead = false;
+    var showFoot = false;
+    switch (pagePosition) {
+        case 'start':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showHead === 'firstPage')
+                showHead = true;
+            break;
+        case 'middle':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            break;
+        case 'end':
+            if (options.showHead === 'everyPage')
+                showHead = true;
+            if (options.showFoot === 'everyPage')
+                showFoot = true;
+            if (options.showFoot === 'lastPage')
+                showFoot = true;
+            break;
+    }
+    doAutoTable(d, __assign(__assign({}, options), { body: bodyContentToDraw, showHead: showHead, showFoot: showFoot, willDrawCell: function (data) {
+            if (options.willDrawCell)
+                options.willDrawCell(data);
+            makeContentConverterHook({
+                head: headReplacementContent,
+                body: bodyReplacementContent,
+                foot: footReplacementContent,
+            })(data);
+        } }));
+}
+
 var _a;
 function autoTable(d, options) {
     var input = parseInput(d, options);
     var table = createTable(d, input);
     drawTable(d, table);
+}
+function autoTableWithTextDecorators(documentOrDrawByPage, options, jsPDFConstructorOptions) {
+    var headContent = parseContentSection(options.head);
+    var bodyContent = parseContentSection(options.body);
+    var footContent = parseContentSection(options.foot);
+    var submitOptions = __assign(__assign({}, options), { head: headContent === null || headContent === void 0 ? void 0 : headContent.compat, body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.compat, foot: footContent === null || footContent === void 0 ? void 0 : footContent.compat, willDrawCell: function (data) {
+            if (options.willDrawCell)
+                options.willDrawCell(data);
+            makeContentConverterHook({
+                head: headContent === null || headContent === void 0 ? void 0 : headContent.customStyles,
+                body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.customStyles,
+                foot: footContent === null || footContent === void 0 ? void 0 : footContent.customStyles,
+            })(data);
+        } });
+    if (documentOrDrawByPage !== true) {
+        return autoTable(documentOrDrawByPage, submitOptions);
+    }
+    // Draw by page
+    var pageDelimits = delimitDataRowsByPage(submitOptions, jsPDFConstructorOptions);
+    var iterator = pageDelimits.pages.entries();
+    return {
+        pageDelimits: pageDelimits,
+        modifyDelimits: function (newBounds) {
+            // TODO, future validation?
+            pageDelimits.pages = newBounds;
+            iterator = pageDelimits.pages.entries();
+        },
+        drawNextPage: function (document) {
+            var pageBounds = iterator.next();
+            if (!pageBounds.done) {
+                drawSinglePageContent(document, submitOptions, {
+                    body: bodyContent === null || bodyContent === void 0 ? void 0 : bodyContent.customStyles,
+                    head: headContent === null || headContent === void 0 ? void 0 : headContent.customStyles,
+                    foot: footContent === null || footContent === void 0 ? void 0 : footContent.customStyles,
+                }, pageBounds.value[1], pageBounds.value[0], pageDelimits.pages.length);
+            }
+            return !pageBounds.done;
+        },
+    };
 }
 // Experimental export
 function __createTable(d, options) {
@@ -2078,4 +2565,4 @@ catch (error) {
     console.error('Could not apply autoTable plugin', error);
 }
 
-export { Cell, CellHookData, Column, HookData, Row, Table, __createTable, __drawTable, applyPlugin, autoTable, autoTable as default };
+export { Cell, CellHookData, Column, HookData, Row, Table, __createTable, __drawTable, applyPlugin, autoTable, autoTableWithTextDecorators, autoTable as default };
