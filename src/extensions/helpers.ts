@@ -14,12 +14,13 @@ export function cellIsCellDefType(cell: CellInput): cell is CellDef {
 /**
  * Converts decorator syntax into the syntax used by the base drawTable function
  */
-export function convertCustomCellContentToString(
-  data: CustomCellText,
-): string[] {
-  return data.map((line) => {
-    return line.map((part) => part.text).join()
-  })
+export function convertCustomCellContentToString(data: CustomCellText): string {
+  // Reintroduce line breaks so that AutoTable does the correct cell height and width calculations
+  return data
+    .flatMap((line) => {
+      return line.map((part) => part.text).join()
+    })
+    .join('\n')
 }
 
 /**

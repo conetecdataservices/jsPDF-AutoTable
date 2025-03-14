@@ -1662,9 +1662,12 @@ function cellIsCellDefType(cell) {
  * Converts decorator syntax into the syntax used by the base drawTable function
  */
 function convertCustomCellContentToString(data) {
-    return data.map(function (line) {
+    // Reintroduce line breaks so that AutoTable does the correct cell height and width calculations
+    return data
+        .flatMap(function (line) {
         return line.map(function (part) { return part.text; }).join();
-    });
+    })
+        .join('\n');
 }
 /**
  * Parses a part of text within a cell and converts into a custom cell object
