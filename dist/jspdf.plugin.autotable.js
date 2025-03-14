@@ -6034,7 +6034,7 @@ var exports = __webpack_exports__;
 
 var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Table = exports.Row = exports.HookData = exports.Column = exports.CellHookData = exports.Cell = exports.applyPlugin = void 0;
+exports.Table = exports.Row = exports.HookData = exports.Column = exports.CellHookData = exports.Cell = exports.cellIsCellDefType = exports.applyPlugin = void 0;
 exports.autoTable = autoTable;
 exports.__createTable = __createTable;
 exports.__drawTable = __drawTable;
@@ -6053,6 +6053,8 @@ Object.defineProperty(exports, "Table", ({ enumerable: true, get: function () { 
 var tableCalculator_1 = __webpack_require__(4376);
 var tableDrawer_1 = __webpack_require__(789);
 var helpers_1 = __webpack_require__(1502);
+var helpers_2 = __webpack_require__(1502);
+Object.defineProperty(exports, "cellIsCellDefType", ({ enumerable: true, get: function () { return helpers_2.cellIsCellDefType; } }));
 function autoTableDrawByPage(args) {
     var jsPDFConstructorArgs = args.jsPDFConstructorArgs, options = args.options;
     // Draw by page

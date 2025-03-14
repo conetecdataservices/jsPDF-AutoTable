@@ -341,6 +341,7 @@ declare class DocHandler {
 }
 export declare function applyPlugin(jsPDF: jsPDFConstructor): void;
 export type PagePositionBodyRowCapacities = Record<"first" | "middle" | "last", number>;
+export declare function cellIsCellDefType(cell: CellInput): cell is CellDef;
 export type autoTableInstanceType = (options: UserOptions) => void;
 export interface AutoTableBaseParams {
 	options: UserOptions;

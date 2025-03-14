@@ -18,6 +18,7 @@ import { preprocessContentSection } from './extensions/helpers'
 
 export type autoTableInstanceType = (options: UserOptions) => void
 export { applyPlugin }
+export { cellIsCellDefType } from './extensions/helpers'
 
 interface AutoTableBaseParams {
   options: UserOptions

@@ -2502,4 +2502,4 @@ catch (error) {
     console.error('Could not apply autoTable plugin', error);
 }
 
-export { Cell, CellHookData, Column, HookData, Row, Table, __createTable, __drawTable, applyPlugin, autoTable, autoTable as default };
+export { Cell, CellHookData, Column, HookData, Row, Table, __createTable, __drawTable, applyPlugin, autoTable, cellIsCellDefType, autoTable as default };
