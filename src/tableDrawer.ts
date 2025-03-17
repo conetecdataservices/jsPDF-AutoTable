@@ -412,6 +412,13 @@ function printRow(
     cell.x = cursor.x
     cell.y = cursor.y
 
+    if (
+      cellIsCellDefType(cell.raw) &&
+      cell.raw.customContentSyntax !== undefined
+    ) {
+      cell.text = cell.raw.customContentSyntax as CustomCellText
+    }
+
     const result = table.callCellHooks(
       doc,
       table.hooks.willDrawCell,
@@ -423,10 +430,6 @@ function printRow(
     if (result === false) {
       cursor.x += column.width
       continue
-    }
-
-    if (cellIsCellDefType(cell.raw)) {
-      cell.text = cell.raw.customContentSyntax as CustomCellText
     }
 
     drawCellRect(doc, cell, cursor)

@@ -2112,13 +2112,14 @@ function printRow(doc, table, row, cursor, columns) {
         doc.applyStyles(cell.styles);
         cell.x = cursor.x;
         cell.y = cursor.y;
+        if (cellIsCellDefType(cell.raw) &&
+            cell.raw.customContentSyntax !== undefined) {
+            cell.text = cell.raw.customContentSyntax;
+        }
         var result = table.callCellHooks(doc, table.hooks.willDrawCell, cell, row, column, cursor);
         if (result === false) {
             cursor.x += column.width;
             continue;
-        }
-        if (cellIsCellDefType(cell.raw)) {
-            cell.text = cell.raw.customContentSyntax;
         }
         drawCellRect(doc, cell, cursor);
         var textPos = cell.getTextPos();
