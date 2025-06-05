@@ -183,7 +183,10 @@ export type FontType = StandardFontType | CustomFontType;
 export type HAlignType = "left" | "center" | "right" | "justify";
 export type VAlignType = "top" | "middle" | "bottom";
 export type OverflowType = "linebreak" | "ellipsize" | "visible" | "hidden" | ((text: string | string[], width: number) => string | string[]);
-export type CellWidthType = "auto" | "wrap" | number;
+/**
+ * If set to equal, will attempt to make all columns have an equal width on the page
+ */
+export type CellWidthType = "auto" | "wrap" | number | "equal";
 export interface Styles {
 	font: FontType;
 	fontStyle: FontStyle;

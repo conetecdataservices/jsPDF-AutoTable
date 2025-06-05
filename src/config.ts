@@ -19,7 +19,11 @@ export type OverflowType =
   | 'visible'
   | 'hidden'
   | ((text: string | string[], width: number) => string | string[])
-export type CellWidthType = 'auto' | 'wrap' | number
+
+/**
+ * If set to equal, will attempt to make all columns have an equal width on the page
+ */
+export type CellWidthType = 'auto' | 'wrap' | number | 'equal'
 
 export interface Styles {
   font: FontType

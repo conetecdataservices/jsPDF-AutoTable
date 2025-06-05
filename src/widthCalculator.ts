@@ -105,6 +105,9 @@ function calculate(doc: DocHandler, table: Table) {
           cell.minWidth = cell.contentWidth
           cell.wrappedWidth = cell.contentWidth
         }
+      } else if (cell.styles.cellWidth === 'equal') {
+        cell.minWidth = availablePageWidth / table.columns.length
+        cell.wrappedWidth = availablePageWidth / table.columns.length
       } else {
         // auto
         const defaultMinWidth = 10 / sf

@@ -1288,6 +1288,10 @@ function calculate(doc, table) {
                     cell.wrappedWidth = cell.contentWidth;
                 }
             }
+            else if (cell.styles.cellWidth === 'equal') {
+                cell.minWidth = availablePageWidth / table.columns.length;
+                cell.wrappedWidth = availablePageWidth / table.columns.length;
+            }
             else {
                 // auto
                 var defaultMinWidth = 10 / sf;
