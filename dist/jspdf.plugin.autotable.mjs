@@ -1,5 +1,3 @@
-import jsPDF$1 from 'jspdf';
-
 function applyCustomCellStyling(doc, style, position) {
     // Store current font
     var currentFont = doc.getFont();
@@ -2319,7 +2317,7 @@ function doAutoTable(d, options) {
 /**
  * Determines how many rows of body content can fit on pages of the PDF, based on size and header/footer visibility
  */
-function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
+function getPageBodyRowsCapacity(userOptions, makeDocCb) {
     var appearanceModifiers = [
         // None
         [false, false],
@@ -2332,7 +2330,7 @@ function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
     ];
     var body = [];
     var maxRowsPerAppearance = appearanceModifiers.map(function (modifierSet) {
-        var tmpDoc = new jsPDF$1(jsPDFOptions);
+        var tmpDoc = makeDocCb();
         var maxRows = 0;
         var madeItToPage2 = false;
         while (!madeItToPage2) {
@@ -2362,9 +2360,9 @@ function getPageBodyRowsCapacity(userOptions, jsPDFOptions) {
         headFoot: maxRowsPerAppearance[3],
     };
 }
-function delimitDataRowsByPage(userOptions, jsPDFConstructorOptions) {
+function delimitDataRowsByPage(userOptions, makeDocCb) {
     var _a, _b;
-    var capacities = getPageBodyRowsCapacity(userOptions, jsPDFConstructorOptions);
+    var capacities = getPageBodyRowsCapacity(userOptions, makeDocCb);
     var pages = [];
     var bodyLength = (_b = (_a = userOptions.body) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
     var pagePositionCapacities = {};
@@ -2453,9 +2451,9 @@ function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
 
 var _a;
 function autoTableDrawByPage(args) {
-    var jsPDFConstructorArgs = args.jsPDFConstructorArgs, options = args.options;
+    var makeJSPDFDocument = args.makeJSPDFDocument, options = args.options;
     // Draw by page
-    var pageDelimits = delimitDataRowsByPage(options, jsPDFConstructorArgs);
+    var pageDelimits = delimitDataRowsByPage(options, makeJSPDFDocument);
     var iterator = pageDelimits.pages.entries();
     return {
         pageDelimits: pageDelimits,
@@ -2500,9 +2498,9 @@ try {
     if (typeof window !== 'undefined' && window) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         var anyWindow = window;
-        var jsPDF = anyWindow.jsPDF || ((_a = anyWindow.jspdf) === null || _a === void 0 ? void 0 : _a.jsPDF);
-        if (jsPDF) {
-            applyPlugin(jsPDF);
+        var jsPDF_1 = anyWindow.jsPDF || ((_a = anyWindow.jspdf) === null || _a === void 0 ? void 0 : _a.jsPDF);
+        if (jsPDF_1) {
+            applyPlugin(jsPDF_1);
         }
     }
 }

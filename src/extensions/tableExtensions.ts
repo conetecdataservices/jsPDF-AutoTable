@@ -1,7 +1,7 @@
 // Custom table extensions for jsPDF-AutoTable, including support for text decorators and drawing by page
 // Also includes a new custom data format to make text decorators easier to use
 
-import jsPDF, { jsPDFOptions } from 'jspdf'
+import jsPDF from 'jspdf'
 import { RowInput, UserOptions } from '../config'
 import { jsPDFDocument } from '../documentHandler'
 import { drawTable as _drawTable } from '../tableDrawer'
@@ -24,7 +24,7 @@ export function doAutoTable(d: jsPDFDocument, options: UserOptions) {
  */
 function getPageBodyRowsCapacity(
   userOptions: UserOptions,
-  jsPDFOptions: jsPDFOptions,
+  makeDocCb: () => jsPDF,
 ): PageAppearanceBodyRowCapacities {
   const appearanceModifiers = [
     // None
@@ -39,7 +39,7 @@ function getPageBodyRowsCapacity(
   const body: RowInput[] = []
 
   const maxRowsPerAppearance = appearanceModifiers.map((modifierSet) => {
-    const tmpDoc = new jsPDF(jsPDFOptions)
+    const tmpDoc = makeDocCb()
 
     let maxRows = 0
     let madeItToPage2 = false
@@ -89,15 +89,12 @@ export type PagePositionBodyRowCapacities = Record<
 
 export function delimitDataRowsByPage(
   userOptions: UserOptions,
-  jsPDFConstructorOptions: jsPDFOptions,
+  makeDocCb: () => jsPDF,
 ): {
   pages: PageRowDelimit[]
   capacities: PagePositionBodyRowCapacities
 } {
-  const capacities = getPageBodyRowsCapacity(
-    userOptions,
-    jsPDFConstructorOptions,
-  )
+  const capacities = getPageBodyRowsCapacity(userOptions, makeDocCb)
 
   const pages: PageRowDelimit[] = []
   const bodyLength = userOptions.body?.length ?? 0

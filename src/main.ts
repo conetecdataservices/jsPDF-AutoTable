@@ -1,6 +1,6 @@
 'use strict'
 
-import { jsPDFOptions } from 'jspdf'
+import jsPDF from 'jspdf'
 import { applyPlugin } from './applyPlugin'
 import { UserOptions } from './config'
 import { jsPDFDocument } from './documentHandler'
@@ -32,7 +32,11 @@ interface AutoTableStandardParams extends AutoTableBaseParams {
 interface AutoTableDrawByPageParams extends AutoTableBaseParams {
   /** Whether or not to draw the table one page at a time via a return page iterator function */
   drawByPage: true
-  jsPDFConstructorArgs: jsPDFOptions
+
+  /**
+   * A callback which should return an empty jsPDF document with the same styling and options set as the real document
+   */
+  makeJSPDFDocument: () => jsPDF
 }
 
 type PageRowDelimit = { min: number; max: number }
@@ -56,10 +60,10 @@ export type DrawByPageMeta = {
 }
 
 function autoTableDrawByPage(args: AutoTableDrawByPageParams): DrawByPageMeta {
-  const { jsPDFConstructorArgs, options } = args
+  const { makeJSPDFDocument, options } = args
 
   // Draw by page
-  const pageDelimits = delimitDataRowsByPage(options, jsPDFConstructorArgs)
+  const pageDelimits = delimitDataRowsByPage(options, makeJSPDFDocument)
   let iterator = pageDelimits.pages.entries()
 
   return {
