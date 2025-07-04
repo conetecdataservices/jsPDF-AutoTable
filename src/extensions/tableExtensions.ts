@@ -171,9 +171,9 @@ export function drawSinglePageContent(
   totalPages: number,
 ) {
   // Get page position
-  let pagePosition: 'start' | 'middle' | 'end'
+  let pagePosition: 'singlePage' | 'start' | 'middle' | 'end'
   if (pageNumber === 0) {
-    pagePosition = 'start'
+    pagePosition = totalPages === 1 ? 'singlePage' : 'start'
   } else if (pageNumber === totalPages - 1) {
     pagePosition = 'end'
   } else {
@@ -185,6 +185,10 @@ export function drawSinglePageContent(
   let showHead = false
   let showFoot = false
   switch (pagePosition) {
+    case 'singlePage':
+      if (options.showHead !== 'never') showHead = true
+      if (options.showFoot !== 'never') showFoot = true
+      break
     case 'start':
       if (options.showHead === 'everyPage') showHead = true
       if (options.showFoot === 'everyPage') showFoot = true

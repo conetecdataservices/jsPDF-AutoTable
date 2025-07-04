@@ -2657,7 +2657,7 @@ function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
     // Get page position
     var pagePosition;
     if (pageNumber === 0) {
-        pagePosition = 'start';
+        pagePosition = totalPages === 1 ? 'singlePage' : 'start';
     }
     else if (pageNumber === totalPages - 1) {
         pagePosition = 'end';
@@ -2669,6 +2669,12 @@ function drawSinglePageContent(d, options, bounds, pageNumber, totalPages) {
     var showHead = false;
     var showFoot = false;
     switch (pagePosition) {
+        case 'singlePage':
+            if (options.showHead !== 'never')
+                showHead = true;
+            if (options.showFoot !== 'never')
+                showFoot = true;
+            break;
         case 'start':
             if (options.showHead === 'everyPage')
                 showHead = true;
