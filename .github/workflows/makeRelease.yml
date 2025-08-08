@@ -30,13 +30,13 @@ jobs:
           node-version: 'lts/*'
           cache: 'npm'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@conetecdataservices'
+          scope: "@conetecdataservices"
 
         # While there aren't multiple packages to worry about, just change the CWD to simplify things
       - name: 📦 Install Dependencies
         run: npm ci
 
-      - name: 🏗️ Build
+      - name: 🏗️ Build & Test
         run: |
           npm run build
 
@@ -44,3 +44,11 @@ jobs:
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Get Tag from package.json
+        run: echo "TAG_NAME=v$(jq -r .version package.json)" >> $GITHUB_ENV
+
+      - name: 🏷️ Create Tag
+        run: |
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
