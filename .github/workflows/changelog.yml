@@ -1,0 +1,51 @@
+# Based on https://github.com/nuxt/nuxt/blob/main/.github/workflows/changelog.yml
+name: Changelog
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  update-release-pr:
+    if: github.event.head_commit.author.name != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      contents: write
+      packages: read
+
+    steps:
+      - name: 🛒 Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐝 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@conetecdataservices"
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 📝 Update Changelog
+        run: npx jiti ./.github/scripts/updateReleasePr.ts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_RELEASE_BRANCH: ci/next-release
+          MAIN_BRANCH: main
+          API_REPO_PATH: https://api.github.com/repos/${{github.repository}}

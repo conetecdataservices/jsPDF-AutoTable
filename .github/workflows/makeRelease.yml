@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  release:
+    if: github.event.pull_request.merged == true && github.event.pull_request.user.login == 'github-actions[bot]' && github.event.pull_request.head.ref == 'ci/next-release'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release
+    permissions:
+      contents: write
+      packages: write
+    timeout-minutes: 10
+    steps:
+      - name: 🛒 Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐝 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@conetecdataservices'
+
+        # While there aren't multiple packages to worry about, just change the CWD to simplify things
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🏗️ Build
+        run: |
+          npm run build
+
+      - name: 🚢 Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
