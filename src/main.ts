@@ -77,6 +77,15 @@ function autoTableDrawByPage(args: AutoTableDrawByPageParams): DrawByPageMeta {
       const pageBounds = iterator.next()
 
       if (!pageBounds.done) {
+        // Sometimes, when the content to draw is right at the page boundary, it can create an extra blank page
+        // and break any system expecting that to not happen
+
+        // To prevent that, we take an index of the current page number, if it changes, then we just delete the last page
+
+        const currentPageNumber = (document as jsPDF).getCurrentPageInfo()
+          .pageNumber
+        console.log(currentPageNumber)
+
         drawSinglePageContent(
           document,
           options,
@@ -84,6 +93,15 @@ function autoTableDrawByPage(args: AutoTableDrawByPageParams): DrawByPageMeta {
           pageBounds.value[0],
           pageDelimits.pages.length,
         )
+
+        const newPageNumber = (document as jsPDF).getCurrentPageInfo()
+          .pageNumber
+
+        // currentPageNumber is 1-indexed, our tracker is 0-indexed
+        if (newPageNumber !== currentPageNumber) {
+          ;(document as jsPDF).deletePage(newPageNumber)
+          ;(document as jsPDF).setPage(currentPageNumber)
+        }
       }
 
       return !pageBounds.done
